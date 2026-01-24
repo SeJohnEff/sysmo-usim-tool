@@ -836,7 +836,7 @@ class Sysmo_isim_sja2(Sysmo_usim):
 		"""
 		if ef.algo in sysmo_isimsjax_16_byte_key_algorithms:
 			print("   %s: Key: %s" % (gen, hexdump(ef.algo_key.ki)))
-		elif ef.algo is SYSMO_ISIMSJA5_ALGO_TUAK:
+		elif ef.algo == SYSMO_ISIMSJA5_ALGO_TUAK:
 			if not ef.algo_pars.use_256_bit_key:
 				print("   %s: Key: %s" % (gen, hexdump(ef.algo_key.key[0:16])))
 			else:
@@ -885,7 +885,7 @@ class Sysmo_isim_sja2(Sysmo_usim):
 			ef.algo_key.ki = key
 			self.sim.update_binary(ef.encode())
 			print(" * %s: Key programmed." % gen)
-		elif ef.algo is SYSMO_ISIMSJA5_ALGO_TUAK:
+		elif ef.algo == SYSMO_ISIMSJA5_ALGO_TUAK:
 			ef.algo_key.key = key
 			ef.algo_pars.use_256_bit_key = False
 			if len(key) > 16:
@@ -1003,10 +1003,10 @@ class Sysmo_isim_sja2(Sysmo_usim):
 		"""
 		Helper method to display OP/OPc
 		"""
-		if ef.algo is SYSMO_ISIMSJA2_ALGO_MILENAGE:
+		if ef.algo == SYSMO_ISIMSJA2_ALGO_MILENAGE:
 			print("   %s: %s: %s" % (gen, id_to_str(sysmo_isimsjax_op_opc, ef.algo_pars.use_opc), \
 						 hexdump(ef.algo_key.opc)))
-		elif ef.algo is SYSMO_ISIMSJA5_ALGO_TUAK:
+		elif ef.algo == SYSMO_ISIMSJA5_ALGO_TUAK:
 			print("   %s: %s: %s" % (gen, id_to_str(sysmo_isimsja5_top_topc, ef.algo_pars.use_topc), \
 						 hexdump(ef.algo_key.topc)))
 		else:
@@ -1049,12 +1049,12 @@ class Sysmo_isim_sja2(Sysmo_usim):
 		"""
 		res = self._read_binary(self.sim.filelen)
 		ef = SYSMO_ISIMSJAX_FILE_EF_USIM_AUTH_KEY(res.apdu)
-		if ef.algo is SYSMO_ISIMSJA2_ALGO_MILENAGE:
+		if ef.algo == SYSMO_ISIMSJA2_ALGO_MILENAGE:
 			ef.algo_key.opc = op
 			ef.algo_pars.use_opc = bool(select)
 			self.sim.update_binary(ef.encode())
 			print("   %s %s programmed." % (gen, id_to_str(sysmo_isimsjax_op_opc, bool(select))));
-		elif ef.algo is SYSMO_ISIMSJA5_ALGO_TUAK and len(op) is 32:
+		elif ef.algo == SYSMO_ISIMSJA5_ALGO_TUAK and len(op) == 32:
 			ef.algo_key.topc = op
 			ef.algo_pars.use_topc = bool(select)
 			self.sim.update_binary(ef.encode())
@@ -1138,7 +1138,7 @@ class Sysmo_isim_sja2(Sysmo_usim):
 		"""
 		Helper method to display key
 		"""
-		if ef.algo is SYSMO_ISIMSJA5_ALGO_TUAK:
+		if ef.algo == SYSMO_ISIMSJA5_ALGO_TUAK:
 			print("   %s: TUAK configuration:" % gen)
 			print("      RES size: %s bit" % id_to_str(sysmo_isimsja5_res_sizes, ef.algo_key.res_size))
 			print("      MAC-A/MAC-S size: %s bit" % id_to_str(sysmo_isimsja5_mac_sizes,  ef.algo_key.mac_size))
@@ -1180,7 +1180,7 @@ class Sysmo_isim_sja2(Sysmo_usim):
 		"""
 		res = self._read_binary(self.sim.filelen)
 		ef = SYSMO_ISIMSJAX_FILE_EF_USIM_AUTH_KEY_2G(res.apdu)
-		if ef.algo is SYSMO_ISIMSJA5_ALGO_TUAK:
+		if ef.algo == SYSMO_ISIMSJA5_ALGO_TUAK:
 			ef.algo_key.res_size = res_size
 			ef.algo_key.mac_size = mac_size
 			ef.algo_key.ckik_size = bool(ckik_size)
