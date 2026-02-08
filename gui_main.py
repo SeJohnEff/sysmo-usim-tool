@@ -166,39 +166,27 @@ class SysmoUSIMToolGUI:
 
     def _refresh_card_status(self):
         """Refresh card status panel with current card data"""
-        print("DEBUG: _refresh_card_status called")
         if not self.card_manager.card:
-            print("DEBUG: No card manager card, returning")
             return
 
         # Update card type
         if self.card_manager.card_type:
             card_name = CardDetector.get_card_type_name(self.card_manager.card_type)
             self.card_status_panel.set_card_info(card_type=card_name)
-            print(f"DEBUG: Updated card type to {card_name}")
 
         # Try to read and display basic info
-        print(f"DEBUG: Card authenticated: {self.card_manager.authenticated}")
         if self.card_manager.authenticated:
             try:
-                print("DEBUG: Calling read_card_data()")
                 data = self.card_manager.read_card_data()
-                print(f"DEBUG: read_card_data returned: {data}")
                 if data:
                     imsi = data.get('imsi')
                     iccid = data.get('iccid')
-                    print(f"DEBUG: Setting card info - IMSI={imsi}, ICCID={iccid}")
                     self.card_status_panel.set_card_info(
                         imsi=imsi,
                         iccid=iccid
                     )
                     self.log(f"Card status updated: IMSI={imsi}, ICCID={iccid}")
-                else:
-                    print("DEBUG: read_card_data returned None")
             except Exception as e:
-                print(f"DEBUG: Exception in _refresh_card_status: {e}")
-                import traceback
-                traceback.print_exc()
                 self.log(f"Error refreshing card status: {e}", "ERROR")
 
     def _detect_card(self):

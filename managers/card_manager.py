@@ -140,21 +140,15 @@ class CardManager:
             # Read IMSI using pySim get_imsi() method
             try:
                 data['imsi'] = self.card.sim.card.get_imsi()
-                print(f"DEBUG: Read IMSI: {data['imsi']}")
             except Exception as e:
                 print(f"ERROR: Failed to read IMSI: {e}")
-                import traceback
-                traceback.print_exc()
                 data['imsi'] = None
 
             # Read ICCID using pySim get_ICCID() method
             try:
                 data['iccid'] = self.card.sim.card.get_ICCID()
-                print(f"DEBUG: Read ICCID: {data['iccid']}")
             except Exception as e:
                 print(f"ERROR: Failed to read ICCID: {e}")
-                import traceback
-                traceback.print_exc()
                 data['iccid'] = None
 
             # Read MNC length from AD file
@@ -167,11 +161,8 @@ class CardManager:
                 ad_data = ad_response.apdu if hasattr(ad_response, 'apdu') else ad_response
                 if ad_data and len(ad_data) > 3:
                     data['mnc_length'] = ad_data[3] & 0x0F
-                    print(f"DEBUG: Read MNC length: {data['mnc_length']}")
             except Exception as e:
                 print(f"ERROR: Failed to read MNC length: {e}")
-                import traceback
-                traceback.print_exc()
                 data['mnc_length'] = None
 
             # Read authentication key (Ki)
