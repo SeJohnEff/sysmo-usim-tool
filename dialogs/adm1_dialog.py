@@ -9,6 +9,12 @@ ADM1 Key Input Dialog
 
 import tkinter as tk
 from tkinter import ttk, messagebox
+import sys
+import os
+
+# Add parent directory to path for imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from theme import ModernTheme
 
 
 class ADM1Dialog(tk.Toplevel):
@@ -19,6 +25,7 @@ class ADM1Dialog(tk.Toplevel):
         self.title("Enter ADM1 Key")
         self.transient(parent)
         self.grab_set()
+        self.configure(bg=ModernTheme.get_color('bg'))
 
         self.remaining_attempts = remaining_attempts
         self.adm1_value = None
@@ -32,36 +39,44 @@ class ADM1Dialog(tk.Toplevel):
 
     def _create_widgets(self):
         """Create dialog widgets"""
-        # Main frame
-        main_frame = ttk.Frame(self, padding="20")
+        pad_medium = ModernTheme.get_padding('medium')
+        pad_large = ModernTheme.get_padding('large')
+
+        # Main frame with modern padding
+        main_frame = ttk.Frame(self, padding=pad_large)
         main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
 
         # Warning if attempts < 3
         if self.remaining_attempts < 3:
             warning_frame = ttk.Frame(main_frame, relief=tk.SOLID, borderwidth=2)
-            warning_frame.grid(row=0, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 10))
+            warning_frame.grid(row=0, column=0, columnspan=2, sticky=(tk.W, tk.E),
+                               pady=(0, pad_medium))
 
             warning_label = ttk.Label(
                 warning_frame,
                 text=f"⚠️  WARNING: Only {self.remaining_attempts} attempts remaining!\nCard will lock after {self.remaining_attempts} more failed attempts!",
-                foreground="red",
-                font=('TkDefaultFont', 10, 'bold'),
-                padding="10"
+                foreground=ModernTheme.get_color('error'),
+                font=ModernTheme.get_font('subheading'),
+                padding=pad_medium
             )
             warning_label.grid(row=0, column=0)
 
-        # ADM1 label
-        ttk.Label(main_frame, text="ADM1 Key:", font=('TkDefaultFont', 10)).grid(
-            row=1, column=0, sticky=tk.W, pady=5
+        # ADM1 label with modern font
+        ttk.Label(main_frame, text="ADM1 Key:", style='Subheading.TLabel').grid(
+            row=1, column=0, sticky=tk.W, pady=(0, ModernTheme.get_padding('small'))
         )
 
-        # ADM1 entry
-        self.adm1_entry = ttk.Entry(main_frame, width=15, font=('TkDefaultFont', 14))
-        self.adm1_entry.grid(row=1, column=1, sticky=(tk.W, tk.E), pady=5)
+        # ADM1 entry with larger font
+        entry_font = (ModernTheme.get_font('default')[0], 16)
+        self.adm1_entry = ttk.Entry(main_frame, width=12, font=entry_font)
+        self.adm1_entry.grid(row=1, column=1, sticky=(tk.W, tk.E),
+                             pady=(0, ModernTheme.get_padding('small')))
         self.adm1_entry.bind('<Return>', lambda e: self._on_ok())
 
         # Validation label
-        self.validation_label = ttk.Label(main_frame, text="8 digits required", foreground="gray")
+        self.validation_label = ttk.Label(main_frame, text="8 digits required",
+                                           foreground=ModernTheme.get_color('disabled'),
+                                           font=ModernTheme.get_font('small'))
         self.validation_label.grid(row=2, column=1, sticky=tk.W)
 
         # Bind validation
@@ -74,26 +89,28 @@ class ADM1Dialog(tk.Toplevel):
                 text="Force authentication (risky!)",
                 variable=self.force_auth
             )
-            force_check.grid(row=3, column=0, columnspan=2, sticky=tk.W, pady=5)
+            force_check.grid(row=3, column=0, columnspan=2, sticky=tk.W,
+                             pady=ModernTheme.get_padding('small'))
 
-        # Buttons
+        # Buttons with modern styling
         button_frame = ttk.Frame(main_frame)
-        button_frame.grid(row=4, column=0, columnspan=2, pady=(15, 0))
+        button_frame.grid(row=4, column=0, columnspan=2, pady=(pad_medium, 0))
 
-        self.ok_button = ttk.Button(button_frame, text="Authenticate", command=self._on_ok, state=tk.DISABLED)
-        self.ok_button.grid(row=0, column=0, padx=5)
+        self.ok_button = ttk.Button(button_frame, text="Authenticate", command=self._on_ok,
+                                      state=tk.DISABLED, style='Primary.TButton')
+        self.ok_button.grid(row=0, column=0, padx=(0, ModernTheme.get_padding('small')))
 
         cancel_button = ttk.Button(button_frame, text="Cancel", command=self._on_cancel)
-        cancel_button.grid(row=0, column=1, padx=5)
+        cancel_button.grid(row=0, column=1)
 
-        # Help text
+        # Help text with modern font
         help_text = ttk.Label(
             main_frame,
             text="The ADM1 key is unique to each card.\nIt should be printed on your card carrier.",
-            font=('TkDefaultFont', 8),
-            foreground="gray"
+            font=ModernTheme.get_font('small'),
+            foreground=ModernTheme.get_color('disabled')
         )
-        help_text.grid(row=5, column=0, columnspan=2, pady=(10, 0))
+        help_text.grid(row=5, column=0, columnspan=2, pady=(pad_small, 0))
 
     def _validate_input(self, event=None):
         """Validate ADM1 input"""

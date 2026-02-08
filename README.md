@@ -326,6 +326,20 @@ Report issues at: https://github.com/SeJohnEff/sysmo-usim-tool/issues
 
 ## Version History
 
+### v1.2 (2026-02-08)
+- ✨ Modern macOS-like user interface
+- ✨ Improved typography and spacing
+- ✨ Color-coded status indicators
+- ✨ Enhanced button styles with clear visual hierarchy
+- ✨ Better readability with increased padding and modern fonts
+
+### v1.1 (2026-02-08)
+- ✨ PLMN (Public Land Mobile Network) programming support
+- ✨ 5G SUCI (Subscription Concealed Identifier) support
+- ✨ Network selection configuration (HPLMN, OPLMN)
+- ✨ Access Technology flags for 2G/3G/4G/5G
+- 📚 Added example_5g_batch_programmer.py reference implementation
+
 ### v1.0 (2026-02-08)
 - ✨ New GUI application with batch programming
 - ✨ CSV import/export

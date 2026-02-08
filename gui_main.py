@@ -16,6 +16,9 @@ from datetime import datetime
 # Add current directory to path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+# Import theme
+from theme import ModernTheme
+
 # Import managers
 from managers.card_manager import CardManager
 from managers.backup_manager import BackupManager
@@ -39,7 +42,10 @@ class SysmoUSIMToolGUI:
     def __init__(self, root):
         self.root = root
         self.root.title("Sysmo-USIM-Tool - Batch Programmer")
-        self.root.geometry("1200x800")
+        self.root.geometry("1300x850")
+
+        # Apply modern theme
+        self.style = ModernTheme.apply_theme(root)
 
         # Managers
         self.card_manager = CardManager()
@@ -98,9 +104,10 @@ class SysmoUSIMToolGUI:
 
     def _create_widgets(self):
         """Create main widgets"""
-        # Main container
+        # Main container with modern spacing
         main_paned = ttk.PanedWindow(self.root, orient=tk.HORIZONTAL)
-        main_paned.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        main_paned.pack(fill=tk.BOTH, expand=True, padx=ModernTheme.get_padding('large'),
+                        pady=ModernTheme.get_padding('large'))
 
         # Left panel
         left_panel = ttk.Frame(main_paned)
@@ -108,7 +115,7 @@ class SysmoUSIMToolGUI:
 
         # Card status panel
         self.card_status_panel = CardStatusPanel(left_panel)
-        self.card_status_panel.pack(fill=tk.X, pady=(0, 10))
+        self.card_status_panel.pack(fill=tk.X, pady=(0, ModernTheme.get_padding('medium')))
         self.card_status_panel.on_detect_callback = self._detect_card
         self.card_status_panel.on_authenticate_callback = self._authenticate_card
 
@@ -122,30 +129,38 @@ class SysmoUSIMToolGUI:
 
         # Progress panel
         self.progress_panel = ProgressPanel(right_panel)
-        self.progress_panel.pack(fill=tk.X, pady=(0, 10))
+        self.progress_panel.pack(fill=tk.X, pady=(0, ModernTheme.get_padding('medium')))
         self.progress_panel.on_start_callback = self._start_batch
         self.progress_panel.on_stop_callback = self._stop_batch
 
-        # Log panel
-        log_frame = ttk.LabelFrame(right_panel, text="Log", padding="10")
+        # Log panel with modern styling
+        log_frame = ttk.LabelFrame(right_panel, text="Activity Log",
+                                    padding=ModernTheme.get_padding('medium'))
         log_frame.pack(fill=tk.BOTH, expand=True)
 
-        # Log text widget
+        # Log text widget with modern font
         self.log_text = scrolledtext.ScrolledText(
             log_frame,
             wrap=tk.WORD,
             width=60,
             height=20,
-            font=('Courier', 9)
+            font=ModernTheme.get_font('mono'),
+            bg=ModernTheme.get_color('panel_bg'),
+            fg=ModernTheme.get_color('fg'),
+            borderwidth=0,
+            relief='flat',
+            highlightthickness=0
         )
-        self.log_text.pack(fill=tk.BOTH, expand=True)
+        self.log_text.pack(fill=tk.BOTH, expand=True, pady=(0, ModernTheme.get_padding('small')))
 
-        # Log buttons
+        # Log buttons with modern spacing
         log_button_frame = ttk.Frame(log_frame)
-        log_button_frame.pack(fill=tk.X, pady=(5, 0))
+        log_button_frame.pack(fill=tk.X, pady=(ModernTheme.get_padding('small'), 0))
 
-        ttk.Button(log_button_frame, text="Clear Log", command=self._clear_log).pack(side=tk.LEFT, padx=2)
-        ttk.Button(log_button_frame, text="Save Log", command=self._save_log).pack(side=tk.LEFT, padx=2)
+        ttk.Button(log_button_frame, text="Clear Log", command=self._clear_log).pack(
+            side=tk.LEFT, padx=(0, ModernTheme.get_padding('small')))
+        ttk.Button(log_button_frame, text="Save Log", command=self._save_log).pack(
+            side=tk.LEFT)
 
     def _setup_bindings(self):
         """Setup keyboard bindings"""

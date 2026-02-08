@@ -14,6 +14,7 @@ import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from managers.csv_manager import CSVManager
+from theme import ModernTheme
 
 
 class CSVEditorPanel(ttk.LabelFrame):
@@ -23,7 +24,8 @@ class CSVEditorPanel(ttk.LabelFrame):
     BASIC_COLUMNS = ['#', 'IMSI', 'ICCID', 'Ki', 'OPc', 'ALGO_2G', 'ALGO_3G', 'MNC_LENGTH']
 
     def __init__(self, parent, **kwargs):
-        super().__init__(parent, text="Card Configurations", padding="10", **kwargs)
+        padding = ModernTheme.get_padding('medium')
+        super().__init__(parent, text="Card Configurations", padding=padding, **kwargs)
 
         self.csv_manager = CSVManager()
         self.show_advanced = tk.BooleanVar(value=False)
@@ -32,26 +34,35 @@ class CSVEditorPanel(ttk.LabelFrame):
 
     def _create_widgets(self):
         """Create panel widgets"""
-        # Toolbar
+        pad_small = ModernTheme.get_padding('small')
+        pad_medium = ModernTheme.get_padding('medium')
+
+        # Toolbar with modern spacing
         toolbar = ttk.Frame(self)
-        toolbar.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=(0, 5))
+        toolbar.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=(0, pad_small))
 
-        ttk.Button(toolbar, text="Load CSV", command=self._on_load_csv).pack(side=tk.LEFT, padx=2)
-        ttk.Button(toolbar, text="Save CSV", command=self._on_save_csv).pack(side=tk.LEFT, padx=2)
-        ttk.Button(toolbar, text="Add Row", command=self._on_add_row).pack(side=tk.LEFT, padx=2)
-        ttk.Button(toolbar, text="Delete Row", command=self._on_delete_row).pack(side=tk.LEFT, padx=2)
+        ttk.Button(toolbar, text="Load CSV", command=self._on_load_csv).pack(
+            side=tk.LEFT, padx=(0, pad_small))
+        ttk.Button(toolbar, text="Save CSV", command=self._on_save_csv).pack(
+            side=tk.LEFT, padx=(0, pad_small))
+        ttk.Button(toolbar, text="Add Row", command=self._on_add_row).pack(
+            side=tk.LEFT, padx=(0, pad_small))
+        ttk.Button(toolbar, text="Delete Row", command=self._on_delete_row).pack(
+            side=tk.LEFT, padx=(0, pad_medium))
 
-        ttk.Separator(toolbar, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=10)
+        ttk.Separator(toolbar, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y,
+                                                         padx=(0, pad_medium))
 
         ttk.Checkbutton(
             toolbar,
-            text="Show Advanced",
+            text="Show Advanced Columns",
             variable=self.show_advanced,
             command=self._toggle_advanced
-        ).pack(side=tk.LEFT, padx=2)
+        ).pack(side=tk.LEFT, padx=(0, pad_small))
 
-        self.card_count_label = ttk.Label(toolbar, text="Cards: 0")
-        self.card_count_label.pack(side=tk.RIGHT, padx=10)
+        self.card_count_label = ttk.Label(toolbar, text="Cards: 0",
+                                           style='Subheading.TLabel')
+        self.card_count_label.pack(side=tk.RIGHT, padx=pad_small)
 
         # Table frame with scrollbars
         table_frame = ttk.Frame(self)

@@ -9,84 +9,112 @@ Progress Panel Widget
 
 import tkinter as tk
 from tkinter import ttk
+import sys
+import os
+
+# Add parent directory to path for imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from theme import ModernTheme
 
 
 class ProgressPanel(ttk.LabelFrame):
     """Panel showing batch programming progress"""
 
     def __init__(self, parent, **kwargs):
-        super().__init__(parent, text="Batch Programming Progress", padding="10", **kwargs)
+        padding = ModernTheme.get_padding('medium')
+        super().__init__(parent, text="Batch Programming Progress", padding=padding, **kwargs)
 
         self._create_widgets()
         self.reset()
 
     def _create_widgets(self):
         """Create panel widgets"""
-        # Current card indicator
-        card_frame = ttk.Frame(self)
-        card_frame.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=5)
+        pad_small = ModernTheme.get_padding('small')
+        pad_medium = ModernTheme.get_padding('medium')
 
-        ttk.Label(card_frame, text="Current Card:", font=('TkDefaultFont', 10, 'bold')).pack(side=tk.LEFT, padx=(0, 10))
-        self.card_number_label = ttk.Label(card_frame, text="0 of 0", font=('TkDefaultFont', 10))
+        # Current card indicator with modern styling
+        card_frame = ttk.Frame(self)
+        card_frame.grid(row=0, column=0, sticky=(tk.W, tk.E), pady=(0, pad_medium))
+
+        ttk.Label(card_frame, text="Current Card:", style='Subheading.TLabel').pack(
+            side=tk.LEFT, padx=(0, pad_small))
+        self.card_number_label = ttk.Label(card_frame, text="0 of 0",
+                                            font=ModernTheme.get_font('default'))
         self.card_number_label.pack(side=tk.LEFT)
 
         # Status text
-        ttk.Label(self, text="Status:", font=('TkDefaultFont', 10, 'bold')).grid(
-            row=1, column=0, sticky=tk.W, pady=(10, 5)
+        ttk.Label(self, text="Status:", style='Subheading.TLabel').grid(
+            row=1, column=0, sticky=tk.W, pady=(pad_small, 3)
         )
-        self.status_label = ttk.Label(self, text="Ready", foreground="gray")
+        self.status_label = ttk.Label(self, text="Ready",
+                                       foreground=ModernTheme.get_color('disabled'))
         self.status_label.grid(row=2, column=0, sticky=tk.W)
 
-        # Progress bar
-        ttk.Label(self, text="Progress:", font=('TkDefaultFont', 10, 'bold')).grid(
-            row=3, column=0, sticky=tk.W, pady=(10, 5)
+        # Progress bar with modern height
+        ttk.Label(self, text="Progress:", style='Subheading.TLabel').grid(
+            row=3, column=0, sticky=tk.W, pady=(pad_medium, 3)
         )
         self.progress_bar = ttk.Progressbar(self, mode='determinate', maximum=100)
-        self.progress_bar.grid(row=4, column=0, sticky=(tk.W, tk.E), pady=5)
+        self.progress_bar.grid(row=4, column=0, sticky=(tk.W, tk.E), pady=(3, pad_small))
 
-        self.progress_percent_label = ttk.Label(self, text="0%", font=('TkDefaultFont', 9))
+        self.progress_percent_label = ttk.Label(self, text="0%",
+                                                 font=ModernTheme.get_font('small'))
         self.progress_percent_label.grid(row=5, column=0, sticky=tk.E)
 
-        # Statistics
+        # Statistics with modern layout
         stats_frame = ttk.Frame(self)
-        stats_frame.grid(row=6, column=0, sticky=(tk.W, tk.E), pady=(15, 5))
+        stats_frame.grid(row=6, column=0, sticky=(tk.W, tk.E), pady=(pad_medium, pad_small))
 
         # Success count
         success_frame = ttk.Frame(stats_frame)
         success_frame.pack(side=tk.LEFT, expand=True, fill=tk.X)
-        ttk.Label(success_frame, text="Success:", foreground="green").pack()
-        self.success_label = ttk.Label(success_frame, text="0", font=('TkDefaultFont', 14, 'bold'), foreground="green")
+        ttk.Label(success_frame, text="Success:",
+                  foreground=ModernTheme.get_color('success')).pack()
+        self.success_label = ttk.Label(success_frame, text="0",
+                                        font=(ModernTheme.get_font('heading')[0], 20, 'bold'),
+                                        foreground=ModernTheme.get_color('success'))
         self.success_label.pack()
 
         # Failed count
         failed_frame = ttk.Frame(stats_frame)
         failed_frame.pack(side=tk.LEFT, expand=True, fill=tk.X)
-        ttk.Label(failed_frame, text="Failed:", foreground="red").pack()
-        self.failed_label = ttk.Label(failed_frame, text="0", font=('TkDefaultFont', 14, 'bold'), foreground="red")
+        ttk.Label(failed_frame, text="Failed:",
+                  foreground=ModernTheme.get_color('error')).pack()
+        self.failed_label = ttk.Label(failed_frame, text="0",
+                                       font=(ModernTheme.get_font('heading')[0], 20, 'bold'),
+                                       foreground=ModernTheme.get_color('error'))
         self.failed_label.pack()
 
         # Skipped count
         skipped_frame = ttk.Frame(stats_frame)
         skipped_frame.pack(side=tk.LEFT, expand=True, fill=tk.X)
-        ttk.Label(skipped_frame, text="Skipped:", foreground="orange").pack()
-        self.skipped_label = ttk.Label(skipped_frame, text="0", font=('TkDefaultFont', 14, 'bold'), foreground="orange")
+        ttk.Label(skipped_frame, text="Skipped:",
+                  foreground=ModernTheme.get_color('warning')).pack()
+        self.skipped_label = ttk.Label(skipped_frame, text="0",
+                                        font=(ModernTheme.get_font('heading')[0], 20, 'bold'),
+                                        foreground=ModernTheme.get_color('warning'))
         self.skipped_label.pack()
 
-        # Buttons
+        # Buttons with modern spacing and styles
         button_frame = ttk.Frame(self)
-        button_frame.grid(row=7, column=0, pady=(15, 0))
+        button_frame.grid(row=7, column=0, pady=(pad_medium, 0))
 
-        self.start_button = ttk.Button(button_frame, text="Start Batch", command=self._on_start)
-        self.start_button.grid(row=0, column=0, padx=5)
+        self.start_button = ttk.Button(button_frame, text="Start Batch",
+                                        command=self._on_start, style='Success.TButton')
+        self.start_button.grid(row=0, column=0, padx=(0, pad_small))
 
-        self.pause_button = ttk.Button(button_frame, text="Pause", command=self._on_pause, state=tk.DISABLED)
-        self.pause_button.grid(row=0, column=1, padx=5)
+        self.pause_button = ttk.Button(button_frame, text="Pause",
+                                        command=self._on_pause, state=tk.DISABLED)
+        self.pause_button.grid(row=0, column=1, padx=(0, pad_small))
 
-        self.skip_button = ttk.Button(button_frame, text="Skip Card", command=self._on_skip, state=tk.DISABLED)
-        self.skip_button.grid(row=0, column=2, padx=5)
+        self.skip_button = ttk.Button(button_frame, text="Skip Card",
+                                       command=self._on_skip, state=tk.DISABLED)
+        self.skip_button.grid(row=0, column=2, padx=(0, pad_small))
 
-        self.stop_button = ttk.Button(button_frame, text="Stop", command=self._on_stop, state=tk.DISABLED)
-        self.stop_button.grid(row=0, column=3, padx=5)
+        self.stop_button = ttk.Button(button_frame, text="Stop",
+                                       command=self._on_stop, state=tk.DISABLED,
+                                       style='Danger.TButton')
+        self.stop_button.grid(row=0, column=3)
 
         # Callbacks
         self.on_start_callback = None

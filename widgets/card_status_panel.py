@@ -9,63 +9,86 @@ Card Status Panel Widget
 
 import tkinter as tk
 from tkinter import ttk
+import sys
+import os
+
+# Add parent directory to path for imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from theme import ModernTheme
 
 
 class CardStatusPanel(ttk.LabelFrame):
     """Panel showing card detection and status"""
 
     def __init__(self, parent, **kwargs):
-        super().__init__(parent, text="Card Status", padding="10", **kwargs)
+        padding = ModernTheme.get_padding('medium')
+        super().__init__(parent, text="Card Status", padding=padding, **kwargs)
 
         self._create_widgets()
         self.set_status("waiting", "Waiting for card...")
 
     def _create_widgets(self):
         """Create panel widgets"""
-        # Status indicator
+        pad_small = ModernTheme.get_padding('small')
+        pad_medium = ModernTheme.get_padding('medium')
+
+        # Status indicator with modern styling
         status_frame = ttk.Frame(self)
-        status_frame.grid(row=0, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=5)
+        status_frame.grid(row=0, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, pad_medium))
 
-        ttk.Label(status_frame, text="Status:", font=('TkDefaultFont', 10, 'bold')).pack(side=tk.LEFT, padx=(0, 10))
+        ttk.Label(status_frame, text="Status:", style='Subheading.TLabel').pack(
+            side=tk.LEFT, padx=(0, pad_small))
 
-        self.status_indicator = tk.Canvas(status_frame, width=20, height=20)
-        self.status_indicator.pack(side=tk.LEFT, padx=(0, 5))
-        self.status_circle = self.status_indicator.create_oval(2, 2, 18, 18, fill='gray', outline='')
+        self.status_indicator = tk.Canvas(status_frame, width=12, height=12,
+                                           bg=ModernTheme.get_color('panel_bg'),
+                                           highlightthickness=0)
+        self.status_indicator.pack(side=tk.LEFT, padx=(0, pad_small))
+        self.status_circle = self.status_indicator.create_oval(1, 1, 11, 11, fill='gray', outline='')
 
-        self.status_label = ttk.Label(status_frame, text="Not detected", font=('TkDefaultFont', 10))
+        self.status_label = ttk.Label(status_frame, text="Not detected")
         self.status_label.pack(side=tk.LEFT)
 
+        # Info section with modern spacing
+        info_pad = pad_small
+
         # Card type
-        ttk.Label(self, text="Card Type:", width=12).grid(row=1, column=0, sticky=tk.W, pady=3)
-        self.card_type_label = ttk.Label(self, text="Unknown", font=('TkDefaultFont', 10, 'bold'))
-        self.card_type_label.grid(row=1, column=1, sticky=tk.W, pady=3)
+        ttk.Label(self, text="Card Type:", width=12).grid(
+            row=1, column=0, sticky=tk.W, pady=info_pad)
+        self.card_type_label = ttk.Label(self, text="Unknown", style='Subheading.TLabel')
+        self.card_type_label.grid(row=1, column=1, sticky=tk.W, pady=info_pad)
 
         # IMSI
-        ttk.Label(self, text="IMSI:", width=12).grid(row=2, column=0, sticky=tk.W, pady=3)
-        self.imsi_label = ttk.Label(self, text="-", foreground="gray")
-        self.imsi_label.grid(row=2, column=1, sticky=tk.W, pady=3)
+        ttk.Label(self, text="IMSI:", width=12).grid(
+            row=2, column=0, sticky=tk.W, pady=info_pad)
+        self.imsi_label = ttk.Label(self, text="-", foreground=ModernTheme.get_color('disabled'))
+        self.imsi_label.grid(row=2, column=1, sticky=tk.W, pady=info_pad)
 
         # ICCID
-        ttk.Label(self, text="ICCID:", width=12).grid(row=3, column=0, sticky=tk.W, pady=3)
-        self.iccid_label = ttk.Label(self, text="-", foreground="gray")
-        self.iccid_label.grid(row=3, column=1, sticky=tk.W, pady=3)
+        ttk.Label(self, text="ICCID:", width=12).grid(
+            row=3, column=0, sticky=tk.W, pady=info_pad)
+        self.iccid_label = ttk.Label(self, text="-", foreground=ModernTheme.get_color('disabled'))
+        self.iccid_label.grid(row=3, column=1, sticky=tk.W, pady=info_pad)
 
         # Authentication status
-        ttk.Label(self, text="Auth Status:", width=12).grid(row=4, column=0, sticky=tk.W, pady=3)
-        self.auth_label = ttk.Label(self, text="Not authenticated", foreground="orange")
-        self.auth_label.grid(row=4, column=1, sticky=tk.W, pady=3)
+        ttk.Label(self, text="Auth Status:", width=12).grid(
+            row=4, column=0, sticky=tk.W, pady=info_pad)
+        self.auth_label = ttk.Label(self, text="Not authenticated",
+                                     foreground=ModernTheme.get_color('warning'))
+        self.auth_label.grid(row=4, column=1, sticky=tk.W, pady=info_pad)
 
-        # Buttons
+        # Buttons with modern styling
         button_frame = ttk.Frame(self)
-        button_frame.grid(row=5, column=0, columnspan=2, pady=(10, 0))
+        button_frame.grid(row=5, column=0, columnspan=2, pady=(pad_medium, 0))
 
-        self.detect_button = ttk.Button(button_frame, text="Detect Card", command=self._on_detect)
-        self.detect_button.grid(row=0, column=0, padx=5)
+        self.detect_button = ttk.Button(button_frame, text="Detect Card",
+                                         command=self._on_detect, style='Primary.TButton')
+        self.detect_button.grid(row=0, column=0, padx=(0, pad_small))
 
         self.auth_button = ttk.Button(
-            button_frame, text="Authenticate", command=self._on_authenticate, state=tk.DISABLED
+            button_frame, text="Authenticate", command=self._on_authenticate,
+            state=tk.DISABLED, style='Primary.TButton'
         )
-        self.auth_button.grid(row=0, column=1, padx=5)
+        self.auth_button.grid(row=0, column=1)
 
         # Callbacks
         self.on_detect_callback = None
