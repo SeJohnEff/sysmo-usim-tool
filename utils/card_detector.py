@@ -120,6 +120,9 @@ class CardDetector:
 
                     return card_type, card
                 except Exception as e:
+                    print(f"DEBUG: Card detection exception: {type(e).__name__}: {e}")
+                    import traceback
+                    traceback.print_exc()
                     return CardType.UNKNOWN, None
             else:
                 # ATR provided, create appropriate object
@@ -137,7 +140,9 @@ class CardDetector:
                 return card_type, card
 
         except Exception as e:
-            print(f"Error creating card object: {e}")
+            print(f"ERROR creating card object: {type(e).__name__}: {e}")
+            import traceback
+            traceback.print_exc()
             return CardType.UNKNOWN, None
 
     @staticmethod
