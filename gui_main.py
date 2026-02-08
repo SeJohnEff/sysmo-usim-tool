@@ -164,6 +164,29 @@ class SysmoUSIMToolGUI:
             # Find the line and apply red color
             pass
 
+    def _refresh_card_status(self):
+        """Refresh card status panel with current card data"""
+        if not self.card_manager.card:
+            return
+
+        # Update card type
+        if self.card_manager.card_type:
+            card_name = CardDetector.get_card_type_name(self.card_manager.card_type)
+            self.card_status_panel.set_card_info(card_type=card_name)
+
+        # Try to read and display basic info
+        if self.card_manager.authenticated:
+            try:
+                data = self.card_manager.read_card_data()
+                if data:
+                    self.card_status_panel.set_card_info(
+                        imsi=data.get('imsi'),
+                        iccid=data.get('iccid')
+                    )
+                    self.log(f"Card status updated: IMSI={data.get('imsi')}, ICCID={data.get('iccid')}")
+            except Exception as e:
+                self.log(f"Error refreshing card status: {e}", "ERROR")
+
     def _detect_card(self):
         """Detect and display card information"""
         self.log("Detecting card...")
@@ -230,7 +253,11 @@ class SysmoUSIMToolGUI:
     def _open_card_editor(self):
         """Open manual card editor dialog"""
         self.log("Opening manual card editor...")
-        CardEditorDialog(self.root, card_manager=self.card_manager)
+        CardEditorDialog(
+            self.root,
+            card_manager=self.card_manager,
+            on_card_changed=self._refresh_card_status
+        )
         # Dialog is modal, will block until closed
 
     def _backup_card(self):

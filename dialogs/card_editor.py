@@ -21,13 +21,14 @@ from utils.validators import Validators, DEFAULT_VALUES
 class CardEditorDialog(tk.Toplevel):
     """Dialog for manually editing a single card configuration"""
 
-    def __init__(self, parent, card_manager=None):
+    def __init__(self, parent, card_manager=None, on_card_changed=None):
         super().__init__(parent)
         self.title("Card Editor - Read/Write Single Card")
         self.geometry("800x700")
         self.transient(parent)
 
         self.card_manager = card_manager
+        self.on_card_changed = on_card_changed
         self.card_data = DEFAULT_VALUES.copy()
 
         # Add basic required fields
@@ -405,6 +406,9 @@ class CardEditorDialog(tk.Toplevel):
 
             if success:
                 messagebox.showinfo("Success", "Card programmed successfully!")
+                # Notify parent to refresh card status
+                if self.on_card_changed:
+                    self.on_card_changed()
             else:
                 messagebox.showerror("Error", f"Failed to program card:\n{message}")
 
