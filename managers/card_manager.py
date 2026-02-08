@@ -137,33 +137,39 @@ class CardManager:
                 'atr': self.atr if self.atr else [],
             }
 
-            # Read IMSI
+            # Read IMSI using pySim get_imsi() method
             try:
-                imsi_raw = self.card.sim.read_imsi()
-                # IMSI is BCD encoded, need to decode
-                data['imsi'] = self._decode_imsi(imsi_raw)
+                data['imsi'] = self.card.sim.card.get_imsi()
                 print(f"DEBUG: Read IMSI: {data['imsi']}")
             except Exception as e:
                 print(f"ERROR: Failed to read IMSI: {e}")
+                import traceback
+                traceback.print_exc()
                 data['imsi'] = None
 
-            # Read ICCID
+            # Read ICCID using pySim get_ICCID() method
             try:
-                iccid_raw = self.card.sim.read_iccid()
-                data['iccid'] = self._decode_iccid(iccid_raw)
+                data['iccid'] = self.card.sim.card.get_ICCID()
                 print(f"DEBUG: Read ICCID: {data['iccid']}")
             except Exception as e:
                 print(f"ERROR: Failed to read ICCID: {e}")
+                import traceback
+                traceback.print_exc()
                 data['iccid'] = None
 
-            # Read MNC length
+            # Read MNC length from AD file
             try:
-                mnc_len = self.card.sim.read_ad()
-                if mnc_len and len(mnc_len) > 3:
-                    data['mnc_length'] = mnc_len[3]
+                # Select and read EF_AD (Administrative Data)
+                self.card.sim.select([0x7F, 0x20])  # Select DF_GSM
+                self.card.sim.select([0x6F, 0xAD])  # Select EF_AD
+                ad_data = self.card.sim.read_binary(4)
+                if ad_data and len(ad_data) > 3:
+                    data['mnc_length'] = ad_data[3] & 0x0F
                     print(f"DEBUG: Read MNC length: {data['mnc_length']}")
             except Exception as e:
                 print(f"ERROR: Failed to read MNC length: {e}")
+                import traceback
+                traceback.print_exc()
                 data['mnc_length'] = None
 
             # Read authentication key (Ki)
