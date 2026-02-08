@@ -62,7 +62,9 @@ class CardStatusPanel(ttk.LabelFrame):
         self.detect_button = ttk.Button(button_frame, text="Detect Card", command=self._on_detect)
         self.detect_button.grid(row=0, column=0, padx=5)
 
-        self.auth_button = ttk.Button(button_frame, text="Authenticate", command=self._on_authenticate, state=tk.DISABLED)
+        self.auth_button = ttk.Button(
+            button_frame, text="Authenticate", command=self._on_authenticate, state=tk.DISABLED
+        )
         self.auth_button.grid(row=0, column=1, padx=5)
 
         # Callbacks

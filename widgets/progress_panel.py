@@ -31,12 +31,16 @@ class ProgressPanel(ttk.LabelFrame):
         self.card_number_label.pack(side=tk.LEFT)
 
         # Status text
-        ttk.Label(self, text="Status:", font=('TkDefaultFont', 10, 'bold')).grid(row=1, column=0, sticky=tk.W, pady=(10, 5))
+        ttk.Label(self, text="Status:", font=('TkDefaultFont', 10, 'bold')).grid(
+            row=1, column=0, sticky=tk.W, pady=(10, 5)
+        )
         self.status_label = ttk.Label(self, text="Ready", foreground="gray")
         self.status_label.grid(row=2, column=0, sticky=tk.W)
 
         # Progress bar
-        ttk.Label(self, text="Progress:", font=('TkDefaultFont', 10, 'bold')).grid(row=3, column=0, sticky=tk.W, pady=(10, 5))
+        ttk.Label(self, text="Progress:", font=('TkDefaultFont', 10, 'bold')).grid(
+            row=3, column=0, sticky=tk.W, pady=(10, 5)
+        )
         self.progress_bar = ttk.Progressbar(self, mode='determinate', maximum=100)
         self.progress_bar.grid(row=4, column=0, sticky=(tk.W, tk.E), pady=5)
 
@@ -189,7 +193,7 @@ if __name__ == "__main__":
         if card <= 5:
             panel.set_current_card(card)
             panel.set_status(f"Programming card {card}...", "blue")
-            panel.update_stats(success=card-1)
+            panel.update_stats(success=card - 1)
             root.after(1000, lambda: simulate_progress(card + 1))
         else:
             panel.set_status("Batch complete!", "green")

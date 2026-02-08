@@ -8,7 +8,6 @@ Card type detection based on ATR (Answer To Reset)
 """
 
 from enum import Enum
-from typing import Optional, Tuple
 import sys
 import os
 
