@@ -15,7 +15,7 @@ from typing import Optional, Dict, List, Tuple
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from utils.card_detector import CardDetector, CardType
-from utils import asciihex_to_list, hexdump
+from utils import asciihex_to_list, hexdump, ascii_to_list
 
 
 class CardError(Exception):
