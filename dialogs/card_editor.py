@@ -42,7 +42,6 @@ class CardEditorDialog(tk.Toplevel):
         self.validation_errors = {}
 
         self._create_widgets()
-        self._create_fields()
         self._update_validation()
 
     def _create_widgets(self):
