@@ -19,6 +19,7 @@ exclude =
     dist,
     tests,
     pySim,
+    card,
     # Original CLI tool files (skip linting for now)
     sysmo_isim_sja2.py,
     sysmo_usim_sjs1.py,
