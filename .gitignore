@@ -2,3 +2,5 @@
 *.egg-info
 *.egg
 my_claude_chat.md
+.DS_Store
+.github/.DS_Store
