@@ -161,6 +161,19 @@ IMSI,ICCID,Ki,OPc,ALGO_2G,ALGO_3G,ALGO_4G5G,MNC_LENGTH,USE_OPC
 - `MNC_LENGTH`: 1 or 2
 - `USE_OPC`: 1 (use OPc) or 0 (use OP)
 
+**Network Selection Columns** (CRITICAL for network registration):
+- `HPLMN`: Home PLMN (5-6 digits: MCC + MNC, e.g., "24001" for Sweden/Telia, "310410" for USA/AT&T)
+  - **This is REQUIRED** - without HPLMN, the card cannot register on any network!
+- `OPLMN_ACT`: Operator PLMN list with Access Technology (optional, format: "PLMN:ACT,PLMN:ACT")
+
+**5G SUCI Columns** (required for 5G SA networks with privacy):
+- `ROUTING_INDICATOR`: 4-digit hex routing indicator (default: "0000")
+- `PROTECTION_SCHEME_ID`: Concealment scheme - 0 (Null), 1 (ProfileA/ECIES), 2 (ProfileB)
+- `HNET_PUBKEY_ID`: Home network public key identifier (1-255)
+- `HNET_PUBKEY`: Home network public key (64 hex characters / 32 bytes for ProfileA)
+
+⚠️ **5G SUCI Implementation Note**: The GUI writes 5G SUCI parameters to card files (EF.SUCI_Calc_Info, EF.Routing_Indicator, EF.UST). For production 5G SA deployments requiring advanced TLV encoding or pySim-specific features, consider using pySim-shell.py directly (see example_5g_batch_programmer.py for reference implementation)
+
 **Advanced Columns** (optional):
 - Milenage: `MILENAGE_R1`-`R5`, `MILENAGE_C1`-`C5`
 - TUAK (SJA5 only): `TUAK_RES_SIZE`, `TUAK_MAC_SIZE`, `TUAK_CKIK_SIZE`, `TUAK_NUM_KECCAK`

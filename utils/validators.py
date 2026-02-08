@@ -148,6 +148,46 @@ class Validators:
         return Validators.validate_hex_string(value, 2, name)
 
     @staticmethod
+    def validate_plmn(value: str) -> Tuple[bool, Optional[str]]:
+        """Validate PLMN - 5 or 6 digits (MCC + MNC)"""
+        if not value or len(value) == 0:
+            return True, None  # Optional
+        if not re.match(r'^\d{5,6}$', value):
+            return False, "PLMN must be 5-6 digits (MCC + MNC)"
+        return True, None
+
+    @staticmethod
+    def validate_routing_indicator(value: str) -> Tuple[bool, Optional[str]]:
+        """Validate Routing Indicator - 4 hex digits"""
+        if not value or len(value) == 0:
+            return True, None  # Optional, defaults to 0000
+        if not re.match(r'^[0-9A-Fa-f]{4}$', value):
+            return False, "Routing Indicator must be 4 hexadecimal digits"
+        return True, None
+
+    @staticmethod
+    def validate_hnet_pubkey(value: str) -> Tuple[bool, Optional[str]]:
+        """Validate Home Network Public Key - 64 hex characters (32 bytes) for ECIES Profile A"""
+        if not value or len(value) == 0:
+            return True, None  # Optional for non-5G cards
+        if not re.match(r'^[0-9A-Fa-f]{64}$', value):
+            return False, "Home Network Public Key must be 64 hexadecimal characters (32 bytes)"
+        return True, None
+
+    @staticmethod
+    def validate_protection_scheme(value: str) -> Tuple[bool, Optional[str]]:
+        """Validate Protection Scheme ID - 0 (Null), 1 (ProfileA/ECIES), 2 (ProfileB)"""
+        if not value or len(value) == 0:
+            return True, None  # Optional, defaults to 1
+        try:
+            scheme = int(value)
+            if scheme not in [0, 1, 2]:
+                return False, "Protection Scheme ID must be 0 (Null), 1 (ProfileA), or 2 (ProfileB)"
+            return True, None
+        except ValueError:
+            return False, "Protection Scheme ID must be a number"
+
+    @staticmethod
     def validate_milenage_c(value: str, name: str) -> Tuple[bool, Optional[str]]:
         """Validate Milenage C parameter - 32 hex characters (16 bytes)"""
         if not value or len(value) == 0:
@@ -272,4 +312,12 @@ DEFAULT_VALUES = {
     'TUAK_MAC_SIZE': '128',
     'TUAK_CKIK_SIZE': '128',
     'TUAK_NUM_KECCAK': '12',
+    # PLMN and network selection (critical for network registration)
+    'HPLMN': '',  # Home PLMN (5-6 digits: MCC + MNC)
+    'OPLMN_ACT': '',  # Operator PLMN list with Access Technology (optional)
+    # 5G SUCI parameters (required for 5G SA networks)
+    'ROUTING_INDICATOR': '0000',  # 4-digit routing indicator for SUCI
+    'PROTECTION_SCHEME_ID': '1',  # 0=Null, 1=ProfileA (ECIES), 2=ProfileB
+    'HNET_PUBKEY_ID': '1',  # Home network public key identifier (1-255)
+    'HNET_PUBKEY': '',  # Home network public key (64 hex chars for ProfileA/ECIES)
 }
