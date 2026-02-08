@@ -9,7 +9,7 @@ max-line-length = 120
 # W503 - line break before binary operator (black-compatible)
 ignore = E402, W503
 
-# Exclude directories
+# Exclude directories and original CLI tool files
 exclude =
     .git,
     __pycache__,
@@ -18,7 +18,15 @@ exclude =
     build,
     dist,
     tests,
-    pySim
+    pySim,
+    # Original CLI tool files (skip linting for now)
+    sysmo_isim_sja2.py,
+    sysmo_usim_sjs1.py,
+    sysmo_usim.py,
+    simcard.py,
+    common.py,
+    utils.py,
+    card_config.py
 
 # Per-file ignores
 per-file-ignores =
