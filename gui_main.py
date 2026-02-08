@@ -17,8 +17,7 @@ from datetime import datetime
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 # Import managers
-from managers.card_manager import CardManager, CardNotPresentError, CardAuthenticationError, CardLockError
-from managers.csv_manager import CSVManager
+from managers.card_manager import CardManager
 from managers.backup_manager import BackupManager
 
 # Import widgets
@@ -187,7 +186,7 @@ class SysmoUSIMToolGUI:
                             imsi=data.get('imsi'),
                             iccid=data.get('iccid')
                         )
-                except:
+                except Exception:
                     pass
         else:
             self.log(f"Card detection failed: {message}", "ERROR")
@@ -216,7 +215,7 @@ class SysmoUSIMToolGUI:
             return
 
         # Attempt authentication
-        self.log(f"Attempting authentication...")
+        self.log("Attempting authentication...")
         success, message = self.card_manager.authenticate(adm1, force)
 
         if success:
@@ -231,7 +230,7 @@ class SysmoUSIMToolGUI:
     def _open_card_editor(self):
         """Open manual card editor dialog"""
         self.log("Opening manual card editor...")
-        dialog = CardEditorDialog(self.root, card_manager=self.card_manager)
+        CardEditorDialog(self.root, card_manager=self.card_manager)
         # Dialog is modal, will block until closed
 
     def _backup_card(self):
@@ -425,7 +424,7 @@ Features:
 def main():
     """Main entry point"""
     root = tk.Tk()
-    app = SysmoUSIMToolGUI(root)
+    app = SysmoUSIMToolGUI(root)  # noqa: F841 - keep reference to prevent GC
     root.mainloop()
 
 

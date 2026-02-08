@@ -15,7 +15,7 @@ from typing import Optional, Dict, List, Tuple
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from utils.card_detector import CardDetector, CardType
-from utils import asciihex_to_list, hexdump, ascii_to_list
+from utils import asciihex_to_list, ascii_to_list
 
 
 class CardError(Exception):
@@ -65,7 +65,7 @@ class CardManager:
             # Get ATR
             try:
                 self.atr = self.card.sim.card.get_ATR()
-            except:
+            except Exception:
                 self.atr = None
 
             card_name = CardDetector.get_card_type_name(self.card_type)
@@ -92,7 +92,6 @@ class CardManager:
 
         try:
             # Convert ADM1 to byte list
-            from utils import ascii_to_list
             adm1_bytes = ascii_to_list(adm1)
 
             # Authenticate using card's method
@@ -113,7 +112,7 @@ class CardManager:
                     return False, "Card is locked! No attempts remaining."
                 except CardAuthenticationError as e:
                     return False, str(e)
-                except:
+                except Exception:
                     return False, "Authentication failed"
 
         except Exception as e:
@@ -140,14 +139,14 @@ class CardManager:
                 imsi_raw = self.card.sim.read_imsi()
                 # IMSI is BCD encoded, need to decode
                 data['imsi'] = self._decode_imsi(imsi_raw)
-            except:
+            except Exception:
                 data['imsi'] = None
 
             # Read ICCID
             try:
                 iccid_raw = self.card.sim.read_iccid()
                 data['iccid'] = self._decode_iccid(iccid_raw)
-            except:
+            except Exception:
                 data['iccid'] = None
 
             # Read MNC length
@@ -155,7 +154,7 @@ class CardManager:
                 mnc_len = self.card.sim.read_ad()
                 if mnc_len and len(mnc_len) > 3:
                     data['mnc_length'] = mnc_len[3]
-            except:
+            except Exception:
                 data['mnc_length'] = None
 
             # Read authentication key (Ki)
@@ -196,7 +195,7 @@ class CardManager:
                 iccid = self._encode_iccid(card_data['ICCID'])
                 try:
                     self.card.sim.write_iccid(iccid)
-                except:
+                except Exception:
                     pass  # Not all cards support ICCID writing
 
             # Program Ki
@@ -282,7 +281,7 @@ class CardManager:
         encoded = [len(imsi)]
         for i in range(0, len(imsi), 2):
             if i + 1 < len(imsi):
-                byte = int(imsi[i+1]) << 4 | int(imsi[i])
+                byte = int(imsi[i + 1]) << 4 | int(imsi[i])
             else:
                 byte = 0xF0 | int(imsi[i])
             encoded.append(byte)
@@ -311,7 +310,7 @@ class CardManager:
         encoded = []
         for i in range(0, len(iccid), 2):
             if i + 1 < len(iccid):
-                byte = int(iccid[i+1]) << 4 | int(iccid[i])
+                byte = int(iccid[i + 1]) << 4 | int(iccid[i])
             else:
                 byte = 0xF0 | int(iccid[i])
             encoded.append(byte)
@@ -377,7 +376,7 @@ class CardManager:
         try:
             from sysmo_usim import SYSMO_USIM_ADM1
             return self.card.sim.chv_retrys(SYSMO_USIM_ADM1)
-        except:
+        except Exception:
             return None
 
     def disconnect(self):

@@ -201,7 +201,7 @@ class BackupManager:
                         'imsi': backup.get('card_data', {}).get('imsi'),
                     })
 
-                except:
+                except Exception:
                     continue
 
             # Sort by timestamp (newest first)

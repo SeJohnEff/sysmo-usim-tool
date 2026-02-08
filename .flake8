@@ -1,0 +1,25 @@
+[flake8]
+# Flake8 configuration for sysmo-usim-tool GUI
+
+# Maximum line length
+max-line-length = 120
+
+# Ignore specific error codes:
+# E402 - module level import not at top of file (needed for sys.path manipulation)
+# W503 - line break before binary operator (black-compatible)
+ignore = E402, W503
+
+# Exclude directories
+exclude =
+    .git,
+    __pycache__,
+    .venv,
+    venv,
+    build,
+    dist,
+    tests,
+    pySim
+
+# Per-file ignores
+per-file-ignores =
+    __init__.py:F401

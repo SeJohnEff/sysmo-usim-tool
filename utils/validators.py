@@ -10,6 +10,7 @@ Validation rules for SIM card parameters
 import re
 from typing import Dict, List, Tuple, Optional
 
+
 class ValidationError(Exception):
     """Validation error with row, column, and message"""
     def __init__(self, row: int, column: str, message: str):
