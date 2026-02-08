@@ -39,6 +39,7 @@ class ADM1Dialog(tk.Toplevel):
 
     def _create_widgets(self):
         """Create dialog widgets"""
+        pad_small = ModernTheme.get_padding('small')
         pad_medium = ModernTheme.get_padding('medium')
         pad_large = ModernTheme.get_padding('large')
 
