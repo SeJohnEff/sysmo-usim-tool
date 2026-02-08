@@ -104,26 +104,32 @@ class CardDetector:
         try:
             # If no ATR provided, try to detect card
             if atr is None:
-                # Try each card type to see which one works
-                # This will automatically read the ATR
+                # Try to create SJA5 first (most recent card)
+                # The constructor will automatically detect the card
                 try:
                     card = Sysmo_isim_sja5()
-                    detected_atr = card.sim.card.get_ATR()
-                    card_type = CardDetector.detect_card_type(detected_atr)
-
-                    # If detected as SJA2 or SJS1, create correct object
-                    if card_type == CardType.SJA2:
-                        card = Sysmo_isim_sja2()
-                    elif card_type == CardType.SJS1:
-                        card = Sysmo_usim_sjs1()
-                    # If SJA5, we already have the right object
-
-                    return card_type, card
+                    # If we get here, SJA5 was detected successfully
+                    return CardType.SJA5, card
                 except Exception as e:
-                    print(f"DEBUG: Card detection exception: {type(e).__name__}: {e}")
-                    import traceback
-                    traceback.print_exc()
-                    return CardType.UNKNOWN, None
+                    print(f"DEBUG: SJA5 detection failed: {e}")
+
+                # Try SJA2
+                try:
+                    card = Sysmo_isim_sja2()
+                    return CardType.SJA2, card
+                except Exception as e:
+                    print(f"DEBUG: SJA2 detection failed: {e}")
+
+                # Try SJS1
+                try:
+                    card = Sysmo_usim_sjs1()
+                    return CardType.SJS1, card
+                except Exception as e:
+                    print(f"DEBUG: SJS1 detection failed: {e}")
+
+                # No card detected
+                print("DEBUG: No supported card type detected")
+                return CardType.UNKNOWN, None
             else:
                 # ATR provided, create appropriate object
                 card_type = CardDetector.detect_card_type(atr)
