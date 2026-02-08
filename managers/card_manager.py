@@ -56,6 +56,9 @@ class CardManager:
         Returns:
             Tuple of (success, message)
         """
+        # Clear any previous card state first
+        self.disconnect()
+
         try:
             self.card_type, self.card = CardDetector.create_card_object()
 
