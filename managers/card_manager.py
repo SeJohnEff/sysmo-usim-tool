@@ -162,7 +162,9 @@ class CardManager:
                 # Select and read EF_AD (Administrative Data)
                 self.card.sim.select([0x7F, 0x20])  # Select DF_GSM
                 self.card.sim.select([0x6F, 0xAD])  # Select EF_AD
-                ad_data = self.card.sim.read_binary(4)
+                ad_response = self.card.sim.read_binary(4)
+                # Extract data from Card_res_apdu object
+                ad_data = ad_response.data if hasattr(ad_response, 'data') else ad_response
                 if ad_data and len(ad_data) > 3:
                     data['mnc_length'] = ad_data[3] & 0x0F
                     print(f"DEBUG: Read MNC length: {data['mnc_length']}")
