@@ -245,6 +245,8 @@ class SysmoUSIMToolGUI:
             self.log("Authentication successful!", "SUCCESS")
             self.card_status_panel.set_status("authenticated", "Authenticated successfully")
             self.card_status_panel.set_auth_status(True)
+            # Refresh card status to show IMSI/ICCID
+            self._refresh_card_status()
             messagebox.showinfo("Success", "Authentication successful!")
         else:
             self.log(f"Authentication failed: {message}", "ERROR")
