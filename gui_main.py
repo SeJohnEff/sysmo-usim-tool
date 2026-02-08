@@ -48,6 +48,9 @@ class SysmoUSIMToolGUI:
         # State
         self.programming_in_progress = False
         self.current_card_index = 0
+        self.batch_success_count = 0
+        self.batch_failed_count = 0
+        self.batch_skipped_count = 0
 
         self._create_menu()
         self._create_widgets()
@@ -314,6 +317,9 @@ class SysmoUSIMToolGUI:
         self.progress_panel.set_running(True)
         self.programming_in_progress = True
         self.current_card_index = 0
+        self.batch_success_count = 0
+        self.batch_failed_count = 0
+        self.batch_skipped_count = 0
 
         # Program first card
         self._program_next_card()
@@ -334,16 +340,7 @@ class SysmoUSIMToolGUI:
         self.progress_panel.set_current_card(card_num)
         self.progress_panel.set_status(f"Programming card {card_num}...", "blue")
 
-        # For now, simulate programming
-        # In full implementation, this would:
-        # 1. Prompt to insert card
-        # 2. Detect card
-        # 3. Authenticate
-        # 4. Backup (optional)
-        # 5. Program
-        # 6. Verify
-        # 7. Move to next
-
+        # Prompt to insert card
         messagebox.showinfo(
             "Insert Card",
             f"Please insert card {card_num}\n\n"
@@ -352,13 +349,160 @@ class SysmoUSIMToolGUI:
             "Click OK when ready."
         )
 
-        # TODO: Actual programming logic here
+        # Detect card
+        self.log("Detecting card...")
+        success, message = self.card_manager.detect_card()
+        if not success:
+            self.log(f"Card detection failed: {message}", "ERROR")
+            result = messagebox.askretrycancel(
+                "Card Detection Failed",
+                f"{message}\n\nRetry detection?"
+            )
+            if result:
+                # Retry same card
+                self.root.after(100, self._program_next_card)
+                return
+            else:
+                # Skip this card
+                self.log(f"Skipped card {card_num}", "WARNING")
+                self.batch_skipped_count += 1
+                self.progress_panel.update_stats(
+                    success=self.batch_success_count,
+                    failed=self.batch_failed_count,
+                    skipped=self.batch_skipped_count
+                )
+                self.current_card_index += 1
+                if self.programming_in_progress:
+                    self.root.after(100, self._program_next_card)
+                return
 
-        # For now, mark as success and move to next
+        self.log(f"Card detected: {message}", "SUCCESS")
+
+        # Authenticate
+        # Get ADM1 from CSV or prompt user
+        adm1 = card_data.get('ADM1', '')
+        if not adm1:
+            from dialogs.adm1_dialog import ADM1Dialog
+            attempts = self.card_manager.get_remaining_attempts()
+            if attempts is None:
+                attempts = 3
+            dialog = ADM1Dialog(self.root, remaining_attempts=attempts)
+            adm1, force = dialog.get_adm1()
+            if not adm1:
+                self.log("Authentication cancelled by user", "WARNING")
+                result = messagebox.askretrycancel(
+                    "Authentication Cancelled",
+                    "Authentication is required to program the card.\n\nRetry?"
+                )
+                if result:
+                    # Retry same card
+                    self.root.after(100, self._program_next_card)
+                    return
+                else:
+                    # Skip this card
+                    self.log(f"Skipped card {card_num}", "WARNING")
+                    self.batch_skipped_count += 1
+                    self.progress_panel.update_stats(
+                        success=self.batch_success_count,
+                        failed=self.batch_failed_count,
+                        skipped=self.batch_skipped_count
+                    )
+                    self.current_card_index += 1
+                    if self.programming_in_progress:
+                        self.root.after(100, self._program_next_card)
+                    return
+
+        self.log("Authenticating...")
+        success, message = self.card_manager.authenticate(adm1, force=False)
+        if not success:
+            self.log(f"Authentication failed: {message}", "ERROR")
+            result = messagebox.askretrycancel(
+                "Authentication Failed",
+                f"{message}\n\nRetry with different key?"
+            )
+            if result:
+                # Retry same card
+                self.root.after(100, self._program_next_card)
+                return
+            else:
+                # Skip this card
+                self.log(f"Skipped card {card_num}", "WARNING")
+                self.batch_skipped_count += 1
+                self.progress_panel.update_stats(
+                    success=self.batch_success_count,
+                    failed=self.batch_failed_count,
+                    skipped=self.batch_skipped_count
+                )
+                self.current_card_index += 1
+                if self.programming_in_progress:
+                    self.root.after(100, self._program_next_card)
+                return
+
+        self.log("Authentication successful!", "SUCCESS")
+
+        # Optional backup
+        # TODO: Add backup option checkbox in GUI
+        # For now, skip backup to keep it simple
+
+        # Program card
+        self.log("Programming card parameters...")
+        success, message = self.card_manager.program_card(card_data)
+        if not success:
+            self.log(f"Programming failed: {message}", "ERROR")
+            self.batch_failed_count += 1
+            self.progress_panel.update_stats(
+                success=self.batch_success_count,
+                failed=self.batch_failed_count,
+                skipped=self.batch_skipped_count
+            )
+            result = messagebox.askretrycancel(
+                "Programming Failed",
+                f"{message}\n\nRetry programming?"
+            )
+            if result:
+                # Retry same card
+                self.root.after(100, self._program_next_card)
+                return
+            else:
+                # Skip to next card
+                self.current_card_index += 1
+                if self.programming_in_progress:
+                    self.root.after(100, self._program_next_card)
+                return
+
+        self.log("Card programmed successfully!", "SUCCESS")
+
+        # Verify
+        self.log("Verifying card data...")
+        success, mismatches = self.card_manager.verify_card(card_data)
+        if not success:
+            self.log(f"Verification failed: {', '.join(mismatches)}", "ERROR")
+            self.batch_failed_count += 1
+            self.progress_panel.update_stats(
+                success=self.batch_success_count,
+                failed=self.batch_failed_count,
+                skipped=self.batch_skipped_count
+            )
+            messagebox.showwarning(
+                "Verification Failed",
+                f"Card was programmed but verification failed:\n\n" +
+                "\n".join(mismatches) +
+                "\n\nPlease check the card manually."
+            )
+        else:
+            self.log("Verification successful!", "SUCCESS")
+            self.batch_success_count += 1
+            self.progress_panel.update_stats(
+                success=self.batch_success_count,
+                failed=self.batch_failed_count,
+                skipped=self.batch_skipped_count
+            )
+
+        # Refresh card status panel to show programmed data
+        self._refresh_card_status()
+
+        # Move to next card
         self.current_card_index += 1
-        self.progress_panel.update_stats(success=self.current_card_index)
-
-        # Continue with next card
         if self.programming_in_progress:
             self.root.after(100, self._program_next_card)
 
