@@ -142,14 +142,18 @@ class CardManager:
                 imsi_raw = self.card.sim.read_imsi()
                 # IMSI is BCD encoded, need to decode
                 data['imsi'] = self._decode_imsi(imsi_raw)
-            except Exception:
+                print(f"DEBUG: Read IMSI: {data['imsi']}")
+            except Exception as e:
+                print(f"ERROR: Failed to read IMSI: {e}")
                 data['imsi'] = None
 
             # Read ICCID
             try:
                 iccid_raw = self.card.sim.read_iccid()
                 data['iccid'] = self._decode_iccid(iccid_raw)
-            except Exception:
+                print(f"DEBUG: Read ICCID: {data['iccid']}")
+            except Exception as e:
+                print(f"ERROR: Failed to read ICCID: {e}")
                 data['iccid'] = None
 
             # Read MNC length
@@ -157,7 +161,9 @@ class CardManager:
                 mnc_len = self.card.sim.read_ad()
                 if mnc_len and len(mnc_len) > 3:
                     data['mnc_length'] = mnc_len[3]
-            except Exception:
+                    print(f"DEBUG: Read MNC length: {data['mnc_length']}")
+            except Exception as e:
+                print(f"ERROR: Failed to read MNC length: {e}")
                 data['mnc_length'] = None
 
             # Read authentication key (Ki)
