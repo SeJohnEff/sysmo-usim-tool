@@ -196,13 +196,13 @@ class CardManager:
             # Program IMSI
             if 'IMSI' in card_data and card_data['IMSI']:
                 imsi = self._encode_imsi(card_data['IMSI'])
-                self.card.sim.write_imsi(imsi)
+                self.card.write_imsi(imsi)
 
             # Program ICCID (if supported)
             if 'ICCID' in card_data and card_data['ICCID']:
                 iccid = self._encode_iccid(card_data['ICCID'])
                 try:
-                    self.card.sim.write_iccid(iccid)
+                    self.card.write_iccid(iccid)
                 except Exception:
                     pass  # Not all cards support ICCID writing
 

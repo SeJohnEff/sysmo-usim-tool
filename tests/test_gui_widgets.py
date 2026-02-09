@@ -1,504 +1,264 @@
 """
-Comprehensive test suite for GUI widgets and dialogs
-Tests user interface components and interactions
+Tests for real GUI widgets (widgets/ and dialogs/).
+Skipped automatically on headless systems without a display.
 """
 
 import unittest
-from unittest.mock import Mock, MagicMock, patch
-import tkinter as tk
+import sys
+import os
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
+def _display_available():
+    """Check if a display is available for tkinter."""
+    try:
+        import tkinter as tk
+        root = tk.Tk()
+        root.withdraw()
+        root.destroy()
+        return True
+    except Exception:
+        return False
+
+
+HAS_DISPLAY = _display_available()
+
+
+@unittest.skipUnless(HAS_DISPLAY, "No display available (headless)")
 class TestCardStatusPanel(unittest.TestCase):
-    """Test suite for card status panel widget"""
 
     def setUp(self):
-        """Set up test fixtures"""
+        import tkinter as tk
+        from theme import ModernTheme
         self.root = tk.Tk()
+        self.root.withdraw()
+        ModernTheme.apply_theme(self.root)
+        from widgets.card_status_panel import CardStatusPanel
         self.panel = CardStatusPanel(self.root)
 
     def tearDown(self):
-        """Clean up"""
         self.root.destroy()
 
     def test_init(self):
-        """Test panel initialization"""
         self.assertIsNotNone(self.panel)
 
-    def test_update_card_detected(self):
-        """Test updating status when card is detected"""
-        self.panel.update_status(
-            detected=True,
-            card_type="SJA2",
-            imsi="001010000000001"
-        )
-        
-        status = self.panel.get_status_text()
-        self.assertIn("SJA2", status)
-        self.assertIn("detected", status.lower())
+    def test_set_status_detected(self):
+        self.panel.set_status("detected", "Card detected: SJA5")
+        self.assertEqual(self.panel.status_label.cget("text"), "Card detected: SJA5")
 
-    def test_update_no_card(self):
-        """Test updating status when no card detected"""
-        self.panel.update_status(detected=False)
-        
-        status = self.panel.get_status_text()
-        self.assertIn("no card", status.lower())
+    def test_set_status_authenticated(self):
+        self.panel.set_status("authenticated", "Authenticated")
+        self.assertEqual(self.panel.status_label.cget("text"), "Authenticated")
 
-    def test_update_authenticated(self):
-        """Test updating authentication status"""
-        self.panel.update_auth_status(authenticated=True)
-        
-        self.assertTrue(self.panel.is_authenticated())
+    def test_set_status_error(self):
+        self.panel.set_status("error", "Card error")
+        self.assertEqual(self.panel.status_label.cget("text"), "Card error")
 
-    def test_clear_status(self):
-        """Test clearing status"""
-        self.panel.update_status(detected=True, card_type="SJA2")
-        self.panel.clear_status()
-        
-        status = self.panel.get_status_text()
-        self.assertEqual(status, "")
+    def test_set_card_info(self):
+        self.panel.set_card_info(card_type="sysmoISIM-SJA5",
+                                 imsi="001010000000001",
+                                 iccid="8988211000000000001")
+        self.assertEqual(self.panel.card_type_label.cget("text"), "sysmoISIM-SJA5")
+        self.assertEqual(self.panel.imsi_label.cget("text"), "001010000000001")
+        self.assertEqual(self.panel.iccid_label.cget("text"), "8988211000000000001")
 
+    def test_set_auth_status_true(self):
+        self.panel.set_auth_status(True)
+        text = self.panel.auth_label.cget("text")
+        self.assertIn("Authenticated", text)
 
-class TestCSVEditorPanel(unittest.TestCase):
-    """Test suite for CSV editor panel"""
+    def test_set_auth_status_false(self):
+        self.panel.set_auth_status(False, "Wrong ADM1")
+        self.assertEqual(self.panel.auth_label.cget("text"), "Wrong ADM1")
 
-    def setUp(self):
-        """Set up test fixtures"""
-        self.root = tk.Tk()
-        self.editor = CSVEditorPanel(self.root)
-        self.sample_data = [
-            {"IMSI": "001010000000001", "ICCID": "8988211000000000001"},
-            {"IMSI": "001010000000002", "ICCID": "8988211000000000002"}
-        ]
+    def test_reset(self):
+        self.panel.set_card_info(card_type="SJA5", imsi="001")
+        self.panel.reset()
+        self.assertEqual(self.panel.card_type_label.cget("text"), "Unknown")
 
-    def tearDown(self):
-        """Clean up"""
-        self.root.destroy()
+    def test_callbacks_default_none(self):
+        self.assertIsNone(self.panel.on_detect_callback)
+        self.assertIsNone(self.panel.on_authenticate_callback)
 
-    def test_load_data(self):
-        """Test loading data into editor"""
-        self.editor.load_data(self.sample_data)
-        
-        row_count = self.editor.get_row_count()
-        self.assertEqual(row_count, 2)
+    def test_detect_callback(self):
+        called = []
+        self.panel.on_detect_callback = lambda: called.append(True)
+        self.panel._on_detect()
+        self.assertEqual(len(called), 1)
 
-    def test_add_row(self):
-        """Test adding a new row"""
-        self.editor.load_data(self.sample_data)
-        
-        new_row = {"IMSI": "001010000000003", "ICCID": "8988211000000000003"}
-        self.editor.add_row(new_row)
-        
-        self.assertEqual(self.editor.get_row_count(), 3)
+    def test_authenticate_callback(self):
+        called = []
+        self.panel.on_authenticate_callback = lambda: called.append(True)
+        self.panel._on_authenticate()
+        self.assertEqual(len(called), 1)
 
-    def test_delete_row(self):
-        """Test deleting a row"""
-        self.editor.load_data(self.sample_data)
-        
-        self.editor.select_row(0)
-        self.editor.delete_selected_row()
-        
-        self.assertEqual(self.editor.get_row_count(), 1)
+    def test_button_states_on_detected(self):
+        import tkinter as tk
+        self.panel.set_status("detected", "Found card")
+        self.assertEqual(str(self.panel.auth_button.cget("state")), "normal")
 
-    def test_edit_cell(self):
-        """Test editing a cell value"""
-        self.editor.load_data(self.sample_data)
-        
-        self.editor.edit_cell(row=0, column="IMSI", value="001010000000999")
-        
-        data = self.editor.get_data()
-        self.assertEqual(data[0]["IMSI"], "001010000000999")
-
-    def test_validate_data(self):
-        """Test data validation"""
-        self.editor.load_data(self.sample_data)
-        
-        is_valid, errors = self.editor.validate_all_data()
-        
-        self.assertTrue(is_valid)
-        self.assertEqual(len(errors), 0)
-
-    def test_get_selected_row(self):
-        """Test getting selected row"""
-        self.editor.load_data(self.sample_data)
-        
-        self.editor.select_row(0)
-        selected = self.editor.get_selected_row()
-        
-        self.assertEqual(selected["IMSI"], "001010000000001")
+    def test_button_states_on_authenticated(self):
+        import tkinter as tk
+        self.panel.set_status("authenticated", "Authed")
+        self.assertIn("disabled", str(self.panel.auth_button.cget("state")))
 
 
+@unittest.skipUnless(HAS_DISPLAY, "No display available (headless)")
 class TestProgressPanel(unittest.TestCase):
-    """Test suite for progress panel"""
 
     def setUp(self):
-        """Set up test fixtures"""
+        import tkinter as tk
+        from theme import ModernTheme
         self.root = tk.Tk()
+        self.root.withdraw()
+        ModernTheme.apply_theme(self.root)
+        from widgets.progress_panel import ProgressPanel
         self.panel = ProgressPanel(self.root)
 
     def tearDown(self):
-        """Clean up"""
         self.root.destroy()
 
     def test_init(self):
-        """Test panel initialization"""
         self.assertIsNotNone(self.panel)
-        self.assertEqual(self.panel.get_progress(), 0)
+        self.assertEqual(self.panel.total_cards, 0)
+        self.assertEqual(self.panel.current_card, 0)
 
-    def test_update_progress(self):
-        """Test updating progress"""
-        self.panel.set_total(10)
-        self.panel.increment_success()
-        
-        self.assertEqual(self.panel.get_progress(), 10)
+    def test_set_total_cards(self):
+        self.panel.set_total_cards(10)
+        self.assertEqual(self.panel.total_cards, 10)
+        self.assertIn("10", self.panel.card_number_label.cget("text"))
 
-    def test_increment_counters(self):
-        """Test incrementing different counters"""
-        self.panel.increment_success()
-        self.panel.increment_failed()
-        self.panel.increment_skipped()
-        
-        self.assertEqual(self.panel.get_success_count(), 1)
-        self.assertEqual(self.panel.get_failed_count(), 1)
-        self.assertEqual(self.panel.get_skipped_count(), 1)
+    def test_set_current_card(self):
+        self.panel.set_total_cards(5)
+        self.panel.set_current_card(3)
+        self.assertEqual(self.panel.current_card, 3)
+        self.assertIn("3", self.panel.card_number_label.cget("text"))
+        self.assertEqual(self.panel.progress_bar['value'], 60)
 
-    def test_reset_progress(self):
-        """Test resetting progress"""
-        self.panel.set_total(10)
-        self.panel.increment_success()
-        
+    def test_set_status(self):
+        self.panel.set_status("Programming IMSI...", "blue")
+        self.assertEqual(self.panel.status_label.cget("text"), "Programming IMSI...")
+
+    def test_update_stats(self):
+        self.panel.update_stats(success=5, failed=1, skipped=2)
+        self.assertEqual(self.panel.success_label.cget("text"), "5")
+        self.assertEqual(self.panel.failed_label.cget("text"), "1")
+        self.assertEqual(self.panel.skipped_label.cget("text"), "2")
+
+    def test_reset(self):
+        self.panel.set_total_cards(10)
+        self.panel.set_current_card(5)
+        self.panel.update_stats(success=3)
         self.panel.reset()
-        
-        self.assertEqual(self.panel.get_progress(), 0)
-        self.assertEqual(self.panel.get_success_count(), 0)
+        self.assertEqual(self.panel.total_cards, 0)
+        self.assertEqual(self.panel.current_card, 0)
+        self.assertEqual(self.panel.success_label.cget("text"), "0")
 
-    def test_update_status_message(self):
-        """Test updating status message"""
-        self.panel.set_status_message("Processing card 1/10...")
-        
-        message = self.panel.get_status_message()
-        self.assertIn("Processing", message)
+    def test_set_running_true(self):
+        import tkinter as tk
+        self.panel.set_running(True)
+        self.assertIn("disabled", str(self.panel.start_button.cget("state")))
+        self.assertEqual(str(self.panel.stop_button.cget("state")), "normal")
 
+    def test_set_running_false(self):
+        import tkinter as tk
+        self.panel.set_running(False)
+        self.assertEqual(str(self.panel.start_button.cget("state")), "normal")
+        self.assertIn("disabled", str(self.panel.stop_button.cget("state")))
 
-class TestManualCardEditor(unittest.TestCase):
-    """Test suite for manual card editor dialog"""
+    def test_callbacks(self):
+        called = {}
+        self.panel.on_start_callback = lambda: called.update(start=True)
+        self.panel.on_pause_callback = lambda: called.update(pause=True)
+        self.panel.on_skip_callback = lambda: called.update(skip=True)
+        self.panel.on_stop_callback = lambda: called.update(stop=True)
 
-    def setUp(self):
-        """Set up test fixtures"""
-        self.root = tk.Tk()
-        self.mock_card = Mock()
-        self.editor = ManualCardEditor(self.root, self.mock_card)
+        self.panel._on_start()
+        self.panel._on_pause()
+        self.panel._on_skip()
+        self.panel._on_stop()
 
-    def tearDown(self):
-        """Clean up"""
-        self.root.destroy()
-
-    def test_init(self):
-        """Test dialog initialization"""
-        self.assertIsNotNone(self.editor)
-
-    def test_load_from_card(self):
-        """Test loading data from card"""
-        self.mock_card.read_imsi.return_value = "001010000000001"
-        self.mock_card.read_iccid.return_value = "8988211000000000001"
-        
-        self.editor.load_from_card()
-        
-        data = self.editor.get_data()
-        self.assertEqual(data["IMSI"], "001010000000001")
-        self.assertEqual(data["ICCID"], "8988211000000000001")
-
-    def test_write_to_card(self):
-        """Test writing data to card"""
-        self.mock_card.write_imsi.return_value = True
-        self.mock_card.write_iccid.return_value = True
-        
-        data = {
-            "IMSI": "001010000000001",
-            "ICCID": "8988211000000000001"
-        }
-        
-        result = self.editor.write_to_card(data)
-        
-        self.assertTrue(result)
-        self.mock_card.write_imsi.assert_called_once()
-
-    def test_validate_inputs(self):
-        """Test input validation"""
-        valid_data = {
-            "IMSI": "001010000000001",
-            "ICCID": "8988211000000000001",
-            "Ki": "00112233445566778899AABBCCDDEEFF"
-        }
-        
-        is_valid, errors = self.editor.validate_inputs(valid_data)
-        
-        self.assertTrue(is_valid)
-        self.assertEqual(len(errors), 0)
+        self.assertTrue(called.get('start'))
+        self.assertTrue(called.get('pause'))
+        self.assertTrue(called.get('skip'))
+        self.assertTrue(called.get('stop'))
 
 
+@unittest.skipUnless(HAS_DISPLAY, "No display available (headless)")
 class TestADM1Dialog(unittest.TestCase):
-    """Test suite for ADM1 input dialog"""
 
     def setUp(self):
-        """Set up test fixtures"""
+        import tkinter as tk
+        from theme import ModernTheme
         self.root = tk.Tk()
-        self.dialog = ADM1Dialog(self.root)
+        self.root.withdraw()
+        ModernTheme.apply_theme(self.root)
 
     def tearDown(self):
-        """Clean up"""
         self.root.destroy()
 
     def test_init(self):
-        """Test dialog initialization"""
-        self.assertIsNotNone(self.dialog)
+        from dialogs.adm1_dialog import ADM1Dialog
+        dialog = ADM1Dialog(self.root, remaining_attempts=3)
+        self.assertIsNotNone(dialog)
+        self.assertIsNone(dialog.adm1_value)
+        dialog.destroy()
 
-    def test_get_adm1_valid(self):
-        """Test getting valid ADM1 input"""
-        self.dialog.set_input("12345678")
-        
-        adm1 = self.dialog.get_adm1()
-        
-        self.assertEqual(adm1, "12345678")
+    def test_init_low_attempts(self):
+        from dialogs.adm1_dialog import ADM1Dialog
+        dialog = ADM1Dialog(self.root, remaining_attempts=1)
+        self.assertEqual(dialog.remaining_attempts, 1)
+        dialog.destroy()
 
-    def test_validate_adm1_format(self):
-        """Test ADM1 format validation"""
-        # Valid
-        self.assertTrue(self.dialog.validate("12345678"))
-        
-        # Invalid - too short
-        self.assertFalse(self.dialog.validate("1234567"))
-        
-        # Invalid - non-digit
-        self.assertFalse(self.dialog.validate("1234567A"))
+    def test_validate_valid_input(self):
+        from dialogs.adm1_dialog import ADM1Dialog
+        dialog = ADM1Dialog(self.root, remaining_attempts=3)
+        dialog.adm1_entry.insert(0, "12345678")
+        dialog._validate_input()
+        text = dialog.validation_label.cget("text")
+        self.assertIn("Valid", text)
+        dialog.destroy()
 
-    def test_cancel_dialog(self):
-        """Test canceling dialog"""
-        self.dialog.cancel()
-        
-        self.assertIsNone(self.dialog.get_adm1())
+    def test_validate_too_short(self):
+        from dialogs.adm1_dialog import ADM1Dialog
+        dialog = ADM1Dialog(self.root, remaining_attempts=3)
+        dialog.adm1_entry.insert(0, "1234")
+        dialog._validate_input()
+        text = dialog.validation_label.cget("text")
+        self.assertIn("more digits", text)
+        dialog.destroy()
 
+    def test_validate_non_digit(self):
+        from dialogs.adm1_dialog import ADM1Dialog
+        dialog = ADM1Dialog(self.root, remaining_attempts=3)
+        dialog.adm1_entry.insert(0, "1234ABCD")
+        dialog._validate_input()
+        text = dialog.validation_label.cget("text")
+        self.assertIn("digits", text.lower())
+        dialog.destroy()
 
-# Mock implementations of GUI components
-class CardStatusPanel:
-    """Mock CardStatusPanel for testing"""
-    
-    def __init__(self, parent):
-        self.parent = parent
-        self.status_text = ""
-        self.authenticated = False
-        
-    def update_status(self, detected=False, card_type=None, imsi=None):
-        """Update status display"""
-        if detected:
-            self.status_text = f"{card_type} card detected"
-            if imsi:
-                self.status_text += f" (IMSI: {imsi})"
-        else:
-            self.status_text = "No card detected"
-            
-    def update_auth_status(self, authenticated):
-        """Update authentication status"""
-        self.authenticated = authenticated
-        
-    def get_status_text(self):
-        """Get current status text"""
-        return self.status_text
-        
-    def is_authenticated(self):
-        """Check if authenticated"""
-        return self.authenticated
-        
-    def clear_status(self):
-        """Clear status"""
-        self.status_text = ""
-        self.authenticated = False
+    def test_validate_too_long(self):
+        from dialogs.adm1_dialog import ADM1Dialog
+        dialog = ADM1Dialog(self.root, remaining_attempts=3)
+        dialog.adm1_entry.insert(0, "123456789")
+        dialog._validate_input()
+        text = dialog.validation_label.cget("text")
+        self.assertIn("Too many", text)
+        dialog.destroy()
 
+    def test_cancel(self):
+        from dialogs.adm1_dialog import ADM1Dialog
+        dialog = ADM1Dialog(self.root, remaining_attempts=3)
+        dialog._on_cancel()
+        self.assertIsNone(dialog.adm1_value)
 
-class CSVEditorPanel:
-    """Mock CSVEditorPanel for testing"""
-    
-    def __init__(self, parent):
-        self.parent = parent
-        self.data = []
-        self.selected_index = None
-        
-    def load_data(self, data):
-        """Load data into editor"""
-        self.data = data.copy()
-        
-    def add_row(self, row):
-        """Add a row"""
-        self.data.append(row)
-        
-    def delete_selected_row(self):
-        """Delete selected row"""
-        if self.selected_index is not None:
-            del self.data[self.selected_index]
-            
-    def select_row(self, index):
-        """Select a row"""
-        self.selected_index = index
-        
-    def edit_cell(self, row, column, value):
-        """Edit a cell"""
-        if row < len(self.data):
-            self.data[row][column] = value
-            
-    def get_row_count(self):
-        """Get row count"""
-        return len(self.data)
-        
-    def get_data(self):
-        """Get all data"""
-        return self.data
-        
-    def get_selected_row(self):
-        """Get selected row"""
-        if self.selected_index is not None:
-            return self.data[self.selected_index]
-        return None
-        
-    def validate_all_data(self):
-        """Validate all data"""
-        errors = []
-        for row in self.data:
-            if "IMSI" in row and len(row["IMSI"]) != 15:
-                errors.append("Invalid IMSI")
-        return len(errors) == 0, errors
-
-
-class ProgressPanel:
-    """Mock ProgressPanel for testing"""
-    
-    def __init__(self, parent):
-        self.parent = parent
-        self.total = 0
-        self.success = 0
-        self.failed = 0
-        self.skipped = 0
-        self.status_message = ""
-        
-    def set_total(self, total):
-        """Set total count"""
-        self.total = total
-        
-    def increment_success(self):
-        """Increment success counter"""
-        self.success += 1
-        
-    def increment_failed(self):
-        """Increment failed counter"""
-        self.failed += 1
-        
-    def increment_skipped(self):
-        """Increment skipped counter"""
-        self.skipped += 1
-        
-    def get_progress(self):
-        """Get progress percentage"""
-        if self.total == 0:
-            return 0
-        completed = self.success + self.failed + self.skipped
-        return int((completed / self.total) * 100)
-        
-    def get_success_count(self):
-        """Get success count"""
-        return self.success
-        
-    def get_failed_count(self):
-        """Get failed count"""
-        return self.failed
-        
-    def get_skipped_count(self):
-        """Get skipped count"""
-        return self.skipped
-        
-    def reset(self):
-        """Reset all counters"""
-        self.success = 0
-        self.failed = 0
-        self.skipped = 0
-        
-    def set_status_message(self, message):
-        """Set status message"""
-        self.status_message = message
-        
-    def get_status_message(self):
-        """Get status message"""
-        return self.status_message
-
-
-class ManualCardEditor:
-    """Mock ManualCardEditor for testing"""
-    
-    def __init__(self, parent, card):
-        self.parent = parent
-        self.card = card
-        self.data = {}
-        
-    def load_from_card(self):
-        """Load data from card"""
-        self.data = {
-            "IMSI": self.card.read_imsi(),
-            "ICCID": self.card.read_iccid()
-        }
-        
-    def write_to_card(self, data):
-        """Write data to card"""
-        try:
-            if "IMSI" in data:
-                self.card.write_imsi(data["IMSI"])
-            if "ICCID" in data:
-                self.card.write_iccid(data["ICCID"])
-            return True
-        except Exception:
-            return False
-            
-    def get_data(self):
-        """Get current data"""
-        return self.data
-        
-    def validate_inputs(self, data):
-        """Validate input data"""
-        errors = []
-        
-        if "IMSI" in data and len(data["IMSI"]) != 15:
-            errors.append("Invalid IMSI")
-            
-        if "ICCID" in data and len(data["ICCID"]) not in (19, 20):
-            errors.append("Invalid ICCID")
-            
-        if "Ki" in data and len(data["Ki"]) != 32:
-            errors.append("Invalid Ki")
-            
-        return len(errors) == 0, errors
-
-
-class ADM1Dialog:
-    """Mock ADM1Dialog for testing"""
-    
-    def __init__(self, parent):
-        self.parent = parent
-        self.adm1 = None
-        
-    def set_input(self, value):
-        """Set input value"""
-        if self.validate(value):
-            self.adm1 = value
-            
-    def get_adm1(self):
-        """Get ADM1 value"""
-        return self.adm1
-        
-    def validate(self, value):
-        """Validate ADM1 format"""
-        if not value or not isinstance(value, str):
-            return False
-        return len(value) == 8 and value.isdigit()
-        
-    def cancel(self):
-        """Cancel dialog"""
-        self.adm1 = None
+    def test_ok_with_valid_input(self):
+        from dialogs.adm1_dialog import ADM1Dialog
+        dialog = ADM1Dialog(self.root, remaining_attempts=3)
+        dialog.adm1_entry.insert(0, "12345678")
+        dialog._on_ok()
+        self.assertEqual(dialog.adm1_value, "12345678")
 
 
 if __name__ == '__main__':

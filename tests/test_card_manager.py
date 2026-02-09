@@ -1,456 +1,551 @@
 """
-Comprehensive test suite for managers/card_manager.py
-Tests card I/O operations, authentication, and programming logic
+Tests for managers/card_manager.py - the REAL CardManager class.
+Mocks only the hardware (Simcard/pySim) layer.
 """
 
 import unittest
-from unittest.mock import Mock, MagicMock, patch, call
-import json
+from unittest.mock import Mock, MagicMock, patch, PropertyMock
+import sys
+import os
+
+# Ensure project root is on path
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from managers.card_manager import (
+    CardManager, CardError, CardNotPresentError,
+    CardAuthenticationError, CardLockError,
+)
+from utils.card_detector import CardType
 
 
-class TestCardManager(unittest.TestCase):
-    """Test suite for CardManager class"""
+class TestCardManagerInit(unittest.TestCase):
+    """Test CardManager initialization and state management."""
 
-    def setUp(self):
-        """Set up test fixtures"""
-        self.mock_card = Mock()
-        self.card_manager = CardManager(self.mock_card)
+    def test_init_defaults(self):
+        cm = CardManager()
+        self.assertIsNone(cm.card)
+        self.assertEqual(cm.card_type, CardType.UNKNOWN)
+        self.assertFalse(cm.authenticated)
+        self.assertIsNone(cm.atr)
 
-    def test_init(self):
-        """Test CardManager initialization"""
-        self.assertIsNotNone(self.card_manager)
-        self.assertEqual(self.card_manager.card, self.mock_card)
-        self.assertFalse(self.card_manager.is_authenticated)
+    def test_disconnect(self):
+        cm = CardManager()
+        cm.card = Mock()
+        cm.card_type = CardType.SJA5
+        cm.authenticated = True
+        cm.atr = [0x3B]
+
+        cm.disconnect()
+
+        self.assertIsNone(cm.card)
+        self.assertEqual(cm.card_type, CardType.UNKNOWN)
+        self.assertFalse(cm.authenticated)
+        self.assertIsNone(cm.atr)
+
+
+class TestCardManagerDetect(unittest.TestCase):
+    """Test card detection."""
+
+    @patch('managers.card_manager.CardDetector')
+    def test_detect_card_success(self, mock_detector_cls):
+        mock_card = Mock()
+        mock_card.sim.card.get_ATR.return_value = [0x3B, 0x9F]
+        mock_detector_cls.create_card_object.return_value = (CardType.SJA5, mock_card)
+        mock_detector_cls.get_card_type_name.return_value = "sysmoISIM-SJA5"
+
+        cm = CardManager()
+        success, msg = cm.detect_card()
+
+        self.assertTrue(success)
+        self.assertIn("sysmoISIM-SJA5", msg)
+        self.assertEqual(cm.card, mock_card)
+        self.assertEqual(cm.card_type, CardType.SJA5)
+
+    @patch('managers.card_manager.CardDetector')
+    def test_detect_card_unknown(self, mock_detector_cls):
+        mock_detector_cls.create_card_object.return_value = (CardType.UNKNOWN, None)
+
+        cm = CardManager()
+        success, msg = cm.detect_card()
+
+        self.assertFalse(success)
+        self.assertIn("unknown", msg.lower())
+
+    @patch('managers.card_manager.CardDetector')
+    def test_detect_card_exception(self, mock_detector_cls):
+        mock_detector_cls.create_card_object.side_effect = Exception("No reader")
+
+        cm = CardManager()
+        success, msg = cm.detect_card()
+
+        self.assertFalse(success)
+        self.assertIn("No reader", msg)
+
+    @patch('managers.card_manager.CardDetector')
+    def test_detect_card_clears_previous_state(self, mock_detector_cls):
+        mock_detector_cls.create_card_object.return_value = (CardType.UNKNOWN, None)
+
+        cm = CardManager()
+        cm.card = Mock()
+        cm.authenticated = True
+
+        cm.detect_card()
+
+        self.assertFalse(cm.authenticated)
+
+
+class TestCardManagerAuthenticate(unittest.TestCase):
+    """Test ADM1 authentication."""
+
+    def _make_cm(self):
+        cm = CardManager()
+        cm.card = Mock()
+        cm.card_type = CardType.SJA5
+        return cm
 
     def test_authenticate_success(self):
-        """Test successful authentication"""
-        self.mock_card.authenticate.return_value = True
-        
-        result = self.card_manager.authenticate("12345678")
-        
-        self.assertTrue(result)
-        self.assertTrue(self.card_manager.is_authenticated)
-        self.mock_card.authenticate.assert_called_once_with("12345678")
+        cm = self._make_cm()
+        cm.card.admin_auth.return_value = True
+
+        success, msg = cm.authenticate("12345678")
+
+        self.assertTrue(success)
+        self.assertTrue(cm.authenticated)
+        cm.card.admin_auth.assert_called_once()
+
+    def test_authenticate_no_card(self):
+        cm = CardManager()
+
+        success, msg = cm.authenticate("12345678")
+
+        self.assertFalse(success)
+        self.assertIn("No card", msg)
 
     def test_authenticate_failure(self):
-        """Test failed authentication"""
-        self.mock_card.authenticate.return_value = False
-        
-        result = self.card_manager.authenticate("00000000")
-        
-        self.assertFalse(result)
-        self.assertFalse(self.card_manager.is_authenticated)
+        cm = self._make_cm()
+        cm.card.admin_auth.return_value = False
+        cm.card.sim.chv_retrys.return_value = 2
 
-    def test_authenticate_invalid_adm1(self):
-        """Test authentication with invalid ADM1 format"""
-        with self.assertRaises(ValueError):
-            self.card_manager.authenticate("1234567")  # Too short
+        success, msg = cm.authenticate("00000000")
 
-    def test_read_imsi(self):
-        """Test reading IMSI from card"""
-        self.mock_card.read_imsi.return_value = "001010000000001"
-        
-        imsi = self.card_manager.read_imsi()
-        
-        self.assertEqual(imsi, "001010000000001")
-        self.mock_card.read_imsi.assert_called_once()
+        self.assertFalse(success)
+        self.assertFalse(cm.authenticated)
 
-    def test_read_imsi_not_authenticated(self):
-        """Test reading IMSI when not authenticated"""
-        self.card_manager.is_authenticated = False
-        
-        with self.assertRaises(RuntimeError):
-            self.card_manager.read_imsi()
+    def test_authenticate_card_locked(self):
+        cm = self._make_cm()
+        cm.card.admin_auth.return_value = False
+        cm.card.sim.chv_retrys.return_value = 0
 
-    def test_write_imsi(self):
-        """Test writing IMSI to card"""
-        self.card_manager.is_authenticated = True
-        self.mock_card.write_imsi.return_value = True
-        
-        result = self.card_manager.write_imsi("001010000000001")
-        
-        self.assertTrue(result)
-        self.mock_card.write_imsi.assert_called_once_with("001010000000001")
+        success, msg = cm.authenticate("00000000")
 
-    def test_write_imsi_invalid(self):
-        """Test writing invalid IMSI"""
-        self.card_manager.is_authenticated = True
-        
-        with self.assertRaises(ValueError):
-            self.card_manager.write_imsi("00101000000")  # Too short
+        self.assertFalse(success)
+        self.assertIn("locked", msg.lower())
 
-    def test_read_iccid(self):
-        """Test reading ICCID from card"""
-        self.mock_card.read_iccid.return_value = "8988211000000000001"
-        
-        iccid = self.card_manager.read_iccid()
-        
-        self.assertEqual(iccid, "8988211000000000001")
 
-    def test_write_iccid(self):
-        """Test writing ICCID to card"""
-        self.card_manager.is_authenticated = True
-        self.mock_card.write_iccid.return_value = True
-        
-        result = self.card_manager.write_iccid("8988211000000000001")
-        
-        self.assertTrue(result)
+class TestCardManagerProgramCard(unittest.TestCase):
+    """Test card programming with real CardManager.program_card()."""
 
-    def test_write_ki(self):
-        """Test writing Ki to card"""
-        self.card_manager.is_authenticated = True
-        ki = "00112233445566778899AABBCCDDEEFF"
-        self.mock_card.write_ki.return_value = True
-        
-        result = self.card_manager.write_ki(ki)
-        
-        self.assertTrue(result)
-        self.mock_card.write_ki.assert_called_once_with(ki)
+    def _make_authenticated_cm(self, card_type=CardType.SJA5):
+        cm = CardManager()
+        cm.card = Mock()
+        cm.card_type = card_type
+        cm.authenticated = True
+        return cm
 
-    def test_write_ki_invalid(self):
-        """Test writing invalid Ki"""
-        self.card_manager.is_authenticated = True
-        
-        with self.assertRaises(ValueError):
-            self.card_manager.write_ki("INVALID")
+    def test_program_card_not_authenticated(self):
+        cm = CardManager()
+        success, msg = cm.program_card({"IMSI": "001010000000001"})
+        self.assertFalse(success)
+        self.assertIn("Not authenticated", msg)
 
-    def test_write_opc(self):
-        """Test writing OPc to card"""
-        self.card_manager.is_authenticated = True
-        opc = "ABCDEF0123456789ABCDEF0123456789"
-        self.mock_card.write_opc.return_value = True
-        
-        result = self.card_manager.write_opc(opc)
-        
-        self.assertTrue(result)
+    def test_program_imsi(self):
+        cm = self._make_authenticated_cm()
+        card_data = {"IMSI": "001010000000001"}
 
-    def test_set_algorithm(self):
-        """Test setting authentication algorithm"""
-        self.card_manager.is_authenticated = True
-        self.mock_card.set_algorithm.return_value = True
-        
-        result = self.card_manager.set_algorithm("MILENAGE", "MILENAGE", "MILENAGE")
-        
-        self.assertTrue(result)
+        success, msg = cm.program_card(card_data)
 
-    def test_set_algorithm_invalid(self):
-        """Test setting invalid algorithm"""
-        self.card_manager.is_authenticated = True
-        
-        with self.assertRaises(ValueError):
-            self.card_manager.set_algorithm("INVALID", "MILENAGE", "MILENAGE")
+        self.assertTrue(success)
+        cm.card.write_imsi.assert_called_once()
+        # Verify the encoded IMSI was passed
+        args = cm.card.write_imsi.call_args[0][0]
+        self.assertIsInstance(args, list)
+        self.assertEqual(args[0], 15)  # Length byte
 
-    def test_program_card_complete(self):
-        """Test programming card with complete configuration"""
-        self.card_manager.is_authenticated = True
-        
-        config = {
-            "IMSI": "001010000000001",
-            "ICCID": "8988211000000000001",
-            "Ki": "00112233445566778899AABBCCDDEEFF",
-            "OPc": "ABCDEF0123456789ABCDEF0123456789",
+    def test_program_iccid(self):
+        cm = self._make_authenticated_cm()
+        card_data = {"ICCID": "8949440000001672706"}
+
+        success, msg = cm.program_card(card_data)
+
+        self.assertTrue(success)
+        cm.card.write_iccid.assert_called_once()
+
+    def test_program_iccid_failure_ignored(self):
+        """ICCID write failure should be silently ignored."""
+        cm = self._make_authenticated_cm()
+        cm.card.write_iccid.side_effect = Exception("Not supported")
+        card_data = {"ICCID": "8949440000001672706"}
+
+        success, msg = cm.program_card(card_data)
+
+        self.assertTrue(success)
+
+    def test_program_ki(self):
+        cm = self._make_authenticated_cm()
+        card_data = {"Ki": "FD4241E9C53B40E6E14107F19DF7C93E"}
+
+        success, msg = cm.program_card(card_data)
+
+        self.assertTrue(success)
+        cm.card.write_key_params.assert_called_once()
+        args = cm.card.write_key_params.call_args[0][0]
+        self.assertEqual(len(args), 16)  # 16 bytes
+
+    def test_program_opc(self):
+        cm = self._make_authenticated_cm()
+        card_data = {"OPc": "BC435ACD7123201B19A2D065B65EB5DA", "USE_OPC": "1"}
+
+        success, msg = cm.program_card(card_data)
+
+        self.assertTrue(success)
+        cm.card.write_opc_params.assert_called_once()
+        args = cm.card.write_opc_params.call_args
+        self.assertEqual(args[0][0], 1)  # use_opc = True
+
+    def test_program_opc_use_op(self):
+        cm = self._make_authenticated_cm()
+        card_data = {"OPc": "BC435ACD7123201B19A2D065B65EB5DA", "USE_OPC": "0"}
+
+        success, msg = cm.program_card(card_data)
+
+        self.assertTrue(success)
+        args = cm.card.write_opc_params.call_args
+        self.assertEqual(args[0][0], 0)  # use_opc = False
+
+    def test_program_algorithms_sja5(self):
+        cm = self._make_authenticated_cm()
+        card_data = {
+            "ALGO_2G": "MILENAGE",
+            "ALGO_3G": "MILENAGE",
+            "ALGO_4G5G": "MILENAGE",
+        }
+
+        success, msg = cm.program_card(card_data)
+
+        self.assertTrue(success)
+        cm.card.write_auth_params.assert_called_once_with("MILENAGE", "MILENAGE", "MILENAGE")
+
+    def test_program_algorithms_no_4g5g(self):
+        cm = self._make_authenticated_cm(CardType.SJS1)
+        card_data = {"ALGO_2G": "MILENAGE", "ALGO_3G": "MILENAGE"}
+
+        success, msg = cm.program_card(card_data)
+
+        self.assertTrue(success)
+        cm.card.write_auth_params.assert_called_once_with("MILENAGE", "MILENAGE")
+
+    def test_program_mnc_length(self):
+        cm = self._make_authenticated_cm()
+        card_data = {"MNC_LENGTH": "2"}
+
+        success, msg = cm.program_card(card_data)
+
+        self.assertTrue(success)
+        cm.card.write_mnclen.assert_called_once_with([2])
+
+    def test_program_complete_card(self):
+        """Test programming a complete card configuration."""
+        cm = self._make_authenticated_cm()
+        card_data = {
+            "IMSI": "240010000167270",
+            "ICCID": "8949440000001672706",
+            "Ki": "FD4241E9C53B40E6E14107F19DF7C93E",
+            "OPc": "BC435ACD7123201B19A2D065B65EB5DA",
             "ALGO_2G": "MILENAGE",
             "ALGO_3G": "MILENAGE",
             "ALGO_4G5G": "MILENAGE",
             "MNC_LENGTH": "2",
             "USE_OPC": "1",
-            "HPLMN": "24001"
+            "HPLMN": "24001",
         }
-        
-        # Mock all write operations to succeed
-        self.mock_card.write_imsi.return_value = True
-        self.mock_card.write_iccid.return_value = True
-        self.mock_card.write_ki.return_value = True
-        self.mock_card.write_opc.return_value = True
-        self.mock_card.set_algorithm.return_value = True
-        self.mock_card.set_mnc_length.return_value = True
-        self.mock_card.write_hplmn.return_value = True
-        
-        result = self.card_manager.program_card(config)
-        
-        self.assertTrue(result)
-        self.mock_card.write_imsi.assert_called_once()
-        self.mock_card.write_iccid.assert_called_once()
-        self.mock_card.write_ki.assert_called_once()
-        self.mock_card.write_opc.assert_called_once()
 
-    def test_program_card_partial_failure(self):
-        """Test programming card with partial failures"""
-        self.card_manager.is_authenticated = True
-        
-        config = {
-            "IMSI": "001010000000001",
-            "ICCID": "8988211000000000001",
-            "Ki": "00112233445566778899AABBCCDDEEFF"
+        success, msg = cm.program_card(card_data)
+
+        self.assertTrue(success)
+        cm.card.write_imsi.assert_called_once()
+        cm.card.write_iccid.assert_called_once()
+        cm.card.write_key_params.assert_called_once()
+        cm.card.write_opc_params.assert_called_once()
+        cm.card.write_auth_params.assert_called_once()
+        cm.card.write_mnclen.assert_called_once()
+        # PLMN is also programmed via sim.select/update_binary
+        self.assertTrue(cm.card.sim.select.called)
+
+    def test_program_card_exception_returns_error(self):
+        cm = self._make_authenticated_cm()
+        cm.card.write_imsi.side_effect = Exception("Card error")
+        card_data = {"IMSI": "001010000000001"}
+
+        success, msg = cm.program_card(card_data)
+
+        self.assertFalse(success)
+        self.assertIn("Card error", msg)
+
+    def test_program_5g_suci_sja5_only(self):
+        """5G SUCI should only be programmed for SJA5 cards."""
+        cm = self._make_authenticated_cm(CardType.SJA2)
+        card_data = {
+            "ROUTING_INDICATOR": "0000",
+            "HNET_PUBKEY": "0e6e6e15b5d20b0aa382ef1b5277a780bfd061cd9b94cf7ee1200faaea5da53f",
         }
-        
-        # IMSI write succeeds, ICCID fails
-        self.mock_card.write_imsi.return_value = True
-        self.mock_card.write_iccid.return_value = False
-        
-        result = self.card_manager.program_card(config)
-        
-        self.assertFalse(result)
 
-    def test_verify_card_data(self):
-        """Test verifying card data after programming"""
-        self.card_manager.is_authenticated = True
-        
-        expected = {
-            "IMSI": "001010000000001",
-            "ICCID": "8988211000000000001",
-            "MNC_LENGTH": "2"
-        }
-        
-        self.mock_card.read_imsi.return_value = "001010000000001"
-        self.mock_card.read_iccid.return_value = "8988211000000000001"
-        self.mock_card.read_mnc_length.return_value = 2
-        
-        is_valid, errors = self.card_manager.verify_card_data(expected)
-        
-        self.assertTrue(is_valid)
-        self.assertEqual(len(errors), 0)
+        success, msg = cm.program_card(card_data)
 
-    def test_verify_card_data_mismatch(self):
-        """Test verification with mismatched data"""
-        self.card_manager.is_authenticated = True
-        
-        expected = {
-            "IMSI": "001010000000001",
-            "ICCID": "8988211000000000001"
-        }
-        
-        # Return different IMSI
-        self.mock_card.read_imsi.return_value = "001010000000002"
-        self.mock_card.read_iccid.return_value = "8988211000000000001"
-        
-        is_valid, errors = self.card_manager.verify_card_data(expected)
-        
-        self.assertFalse(is_valid)
-        self.assertIn("IMSI", str(errors))
+        self.assertTrue(success)
+        # For SJA2, 5G SUCI should NOT be written
+        # The sim.select should not be called for DF.5GS
+        select_calls = [str(c) for c in cm.card.sim.select.call_args_list]
+        for call_str in select_calls:
+            self.assertNotIn("[95, 192]", call_str)  # 0x5FC0 = DF.5GS
 
-    def test_read_mnc_length(self):
-        """Test reading MNC length from EF_AD"""
-        self.mock_card.read_mnc_length.return_value = 2
-        
-        mnc_length = self.card_manager.read_mnc_length()
-        
-        self.assertEqual(mnc_length, 2)
-
-    def test_write_5g_suci_params(self):
-        """Test writing 5G SUCI parameters"""
-        self.card_manager.is_authenticated = True
-        
-        suci_params = {
+    def test_program_5g_suci_sja5(self):
+        """5G SUCI should be programmed for SJA5 cards with HNET_PUBKEY."""
+        cm = self._make_authenticated_cm(CardType.SJA5)
+        card_data = {
             "ROUTING_INDICATOR": "0000",
             "PROTECTION_SCHEME_ID": "1",
             "HNET_PUBKEY_ID": "1",
-            "HNET_PUBKEY": "A" * 64
+            "HNET_PUBKEY": "0e6e6e15b5d20b0aa382ef1b5277a780bfd061cd9b94cf7ee1200faaea5da53f",
         }
-        
-        self.mock_card.write_5g_suci.return_value = True
-        
-        result = self.card_manager.write_5g_suci_params(suci_params)
-        
-        self.assertTrue(result)
+        # Mock read_binary for UST
+        mock_ust = Mock()
+        mock_ust.apdu = [0x00] * 16
+        cm.card.sim.read_binary.return_value = mock_ust
 
-    def test_backup_card_to_json(self):
-        """Test backing up card configuration to JSON"""
-        self.mock_card.read_imsi.return_value = "001010000000001"
-        self.mock_card.read_iccid.return_value = "8988211000000000001"
-        
-        backup = self.card_manager.backup_card_to_json()
-        
-        self.assertIsInstance(backup, dict)
-        self.assertIn("IMSI", backup)
-        self.assertIn("ICCID", backup)
+        success, msg = cm.program_card(card_data)
 
-    def test_get_card_info(self):
-        """Test getting card information"""
-        self.mock_card.get_card_type.return_value = "SJA2"
-        self.mock_card.read_imsi.return_value = "001010000000001"
-        
-        info = self.card_manager.get_card_info()
-        
-        self.assertIn("card_type", info)
-        self.assertIn("imsi", info)
+        self.assertTrue(success)
+        # Verify sim.select was called for DF.5GS files
+        self.assertTrue(cm.card.sim.update_binary.called)
 
-    def test_detect_card_type(self):
-        """Test auto-detecting card type"""
-        self.mock_card.get_atr.return_value = "3B9F96801F..."
-        
-        card_type = self.card_manager.detect_card_type()
-        
-        self.assertIn(card_type, ["SJA2", "SJA5", "SJS1"])
-
-
-class TestCardConnection(unittest.TestCase):
-    """Test card connection and detection"""
-
-    @patch('smartcard.System.readers')
-    def test_detect_readers(self, mock_readers):
-        """Test detecting card readers"""
-        mock_readers.return_value = [Mock(), Mock()]
-        
-        readers = detect_card_readers()
-        
-        self.assertEqual(len(readers), 2)
-
-    @patch('smartcard.System.readers')
-    def test_no_readers_detected(self, mock_readers):
-        """Test when no readers are detected"""
-        mock_readers.return_value = []
-        
-        with self.assertRaises(RuntimeError):
-            detect_card_readers()
-
-    @patch('smartcard.CardConnection')
-    def test_connect_to_card(self, mock_connection):
-        """Test connecting to card"""
-        mock_conn = Mock()
-        mock_connection.return_value = mock_conn
-        
-        connection = connect_to_card()
-        
-        self.assertIsNotNone(connection)
-
-
-# Mock CardManager implementation
-class CardManager:
-    """Mock CardManager for testing"""
-    
-    def __init__(self, card):
-        self.card = card
-        self.is_authenticated = False
-        
-    def authenticate(self, adm1):
-        """Authenticate with ADM1 key"""
-        if len(adm1) != 8 or not adm1.isdigit():
-            raise ValueError("Invalid ADM1 format")
-        
-        self.is_authenticated = self.card.authenticate(adm1)
-        return self.is_authenticated
-        
-    def read_imsi(self):
-        """Read IMSI from card"""
-        if not self.is_authenticated:
-            raise RuntimeError("Not authenticated")
-        return self.card.read_imsi()
-        
-    def write_imsi(self, imsi):
-        """Write IMSI to card"""
-        if len(imsi) != 15 or not imsi.isdigit():
-            raise ValueError("Invalid IMSI")
-        return self.card.write_imsi(imsi)
-        
-    def read_iccid(self):
-        """Read ICCID from card"""
-        return self.card.read_iccid()
-        
-    def write_iccid(self, iccid):
-        """Write ICCID to card"""
-        return self.card.write_iccid(iccid)
-        
-    def write_ki(self, ki):
-        """Write Ki to card"""
-        if len(ki) != 32:
-            raise ValueError("Invalid Ki length")
-        try:
-            int(ki, 16)
-        except ValueError:
-            raise ValueError("Invalid Ki hex format")
-        return self.card.write_ki(ki)
-        
-    def write_opc(self, opc):
-        """Write OPc to card"""
-        return self.card.write_opc(opc)
-        
-    def set_algorithm(self, algo_2g, algo_3g, algo_4g5g):
-        """Set authentication algorithms"""
-        valid = ["COMP128v1", "COMP128v2", "COMP128v3", 
-                 "MILENAGE", "SHA1-AKA", "XOR", "XOR-2G", "TUAK"]
-        if algo_2g not in valid:
-            raise ValueError("Invalid algorithm")
-        return self.card.set_algorithm(algo_2g, algo_3g, algo_4g5g)
-        
-    def program_card(self, config):
-        """Program card with configuration"""
-        try:
-            if "IMSI" in config:
-                if not self.card.write_imsi(config["IMSI"]):
-                    return False
-            if "ICCID" in config:
-                if not self.card.write_iccid(config["ICCID"]):
-                    return False
-            if "Ki" in config:
-                if not self.card.write_ki(config["Ki"]):
-                    return False
-            if "OPc" in config:
-                if not self.card.write_opc(config["OPc"]):
-                    return False
-            return True
-        except Exception:
-            return False
-            
-    def verify_card_data(self, expected):
-        """Verify card data matches expected"""
-        errors = []
-        
-        if "IMSI" in expected:
-            actual_imsi = self.card.read_imsi()
-            if actual_imsi != expected["IMSI"]:
-                errors.append(f"IMSI mismatch: {actual_imsi} != {expected['IMSI']}")
-                
-        if "ICCID" in expected:
-            actual_iccid = self.card.read_iccid()
-            if actual_iccid != expected["ICCID"]:
-                errors.append(f"ICCID mismatch")
-                
-        return len(errors) == 0, errors
-        
-    def read_mnc_length(self):
-        """Read MNC length from card"""
-        return self.card.read_mnc_length()
-        
-    def write_5g_suci_params(self, params):
-        """Write 5G SUCI parameters"""
-        return self.card.write_5g_suci(params)
-        
-    def backup_card_to_json(self):
-        """Backup card to JSON"""
-        return {
-            "IMSI": self.card.read_imsi(),
-            "ICCID": self.card.read_iccid()
+    def test_program_tuak_params(self):
+        cm = self._make_authenticated_cm(CardType.SJA5)
+        card_data = {
+            "TUAK_RES_SIZE": "128",
+            "TUAK_MAC_SIZE": "128",
+            "TUAK_CKIK_SIZE": "128",
+            "TUAK_NUM_KECCAK": "12",
         }
-        
-    def get_card_info(self):
-        """Get card information"""
-        return {
-            "card_type": self.card.get_card_type(),
-            "imsi": self.card.read_imsi()
-        }
-        
-    def detect_card_type(self):
-        """Detect card type from ATR"""
-        atr = self.card.get_atr()
-        if "9F96" in atr:
-            return "SJA2"
-        return "SJS1"
+
+        success, msg = cm.program_card(card_data)
+
+        self.assertTrue(success)
+        cm.card.write_tuak_cfg.assert_called_once_with("128", "128", "128", "12")
 
 
-def detect_card_readers():
-    """Detect available card readers"""
-    from smartcard.System import readers
-    reader_list = readers()
-    if not reader_list:
-        raise RuntimeError("No card readers detected")
-    return reader_list
+class TestEncodeDecodeFunctions(unittest.TestCase):
+    """Test IMSI/ICCID/PLMN encoding and decoding."""
+
+    def setUp(self):
+        self.cm = CardManager()
+
+    def test_encode_imsi_15_digits(self):
+        result = self.cm._encode_imsi("240010000167270")
+        self.assertEqual(result[0], 15)  # length
+        self.assertIsInstance(result, list)
+        self.assertEqual(len(result), 8)  # 1 length + 7.5 digits -> 8 bytes
+
+    def test_encode_imsi_roundtrip(self):
+        original = "240010000167270"
+        encoded = self.cm._encode_imsi(original)
+        decoded = self.cm._decode_imsi(encoded)
+        self.assertEqual(decoded, original)
+
+    def test_encode_imsi_all_zeros(self):
+        original = "000000000000000"
+        encoded = self.cm._encode_imsi(original)
+        decoded = self.cm._decode_imsi(encoded)
+        self.assertEqual(decoded, original)
+
+    def test_decode_imsi_invalid(self):
+        self.assertIsNone(self.cm._decode_imsi([]))
+        self.assertIsNone(self.cm._decode_imsi([0]))
+
+    def test_encode_iccid(self):
+        result = self.cm._encode_iccid("8949440000001672706")
+        self.assertIsInstance(result, list)
+        # 19 digits -> 10 bytes (last nibble padded with F)
+        self.assertEqual(len(result), 10)
+
+    def test_encode_iccid_roundtrip(self):
+        original = "89494400000016727060"  # 20-digit ICCID
+        encoded = self.cm._encode_iccid(original)
+        decoded = self.cm._decode_iccid(encoded)
+        self.assertEqual(decoded, original)
+
+    def test_decode_iccid_empty(self):
+        self.assertIsNone(self.cm._decode_iccid([]))
+
+    def test_encode_plmn_2digit_mnc(self):
+        """Test PLMN encoding: "24001" (MCC=240, MNC=01)."""
+        result = self.cm._encode_plmn("24001")
+        self.assertEqual(result, [0x42, 0xF0, 0x10])
+
+    def test_encode_plmn_3digit_mnc(self):
+        """Test PLMN encoding: "310410" (MCC=310, MNC=410)."""
+        result = self.cm._encode_plmn("310410")
+        self.assertEqual(result, [0x13, 0x04, 0x01])
+
+    def test_encode_plmn_invalid_length(self):
+        with self.assertRaises(ValueError):
+            self.cm._encode_plmn("240")
+
+    def test_get_access_technology_flags_all(self):
+        card_data = {"ALGO_2G": "MILENAGE", "ALGO_3G": "MILENAGE", "ALGO_4G5G": "TUAK"}
+        flags = self.cm._get_access_technology_flags(card_data)
+        self.assertEqual(len(flags), 2)
+        flag_val = (flags[0] << 8) | flags[1]
+        self.assertTrue(flag_val & 0x0080)  # GSM
+        self.assertTrue(flag_val & 0x8000)  # UTRAN
+        self.assertTrue(flag_val & 0x4000)  # E-UTRAN
+        self.assertTrue(flag_val & 0x2000)  # NR (5G via TUAK)
+
+    def test_get_access_technology_flags_2g_only(self):
+        card_data = {"ALGO_2G": "COMP128v1"}
+        flags = self.cm._get_access_technology_flags(card_data)
+        flag_val = (flags[0] << 8) | flags[1]
+        self.assertTrue(flag_val & 0x0080)  # GSM
+        self.assertFalse(flag_val & 0x8000)  # No UTRAN
+        self.assertFalse(flag_val & 0x4000)  # No E-UTRAN
+
+    def test_get_access_technology_flags_empty(self):
+        card_data = {}
+        flags = self.cm._get_access_technology_flags(card_data)
+        flag_val = (flags[0] << 8) | flags[1]
+        self.assertEqual(flag_val, 0)
 
 
-def connect_to_card():
-    """Connect to card in reader"""
-    # Mock implementation
-    return Mock()
+class TestCardManagerVerify(unittest.TestCase):
+    """Test card verification."""
+
+    def test_verify_not_authenticated(self):
+        cm = CardManager()
+        ok, mismatches = cm.verify_card({"IMSI": "001010000000001"})
+        self.assertFalse(ok)
+
+    def test_verify_matching(self):
+        cm = CardManager()
+        cm.authenticated = True
+        cm.card = Mock()
+        cm.card.sim.card.get_imsi.return_value = "001010000000001"
+        cm.card.sim.card.get_ICCID.return_value = "8988211000000000001"
+        cm.card_type = CardType.SJA5
+
+        # Mock the EF_AD read
+        mock_ad = Mock()
+        mock_ad.apdu = [0x00, 0x00, 0x00, 0x02]
+        cm.card.sim.read_binary.return_value = mock_ad
+
+        ok, mismatches = cm.verify_card({
+            "IMSI": "001010000000001",
+            "ICCID": "8988211000000000001",
+        })
+        self.assertTrue(ok)
+        self.assertEqual(len(mismatches), 0)
+
+    def test_verify_imsi_mismatch(self):
+        cm = CardManager()
+        cm.authenticated = True
+        cm.card = Mock()
+        cm.card.sim.card.get_imsi.return_value = "001010000000002"
+        cm.card.sim.card.get_ICCID.return_value = "8988211000000000001"
+        cm.card_type = CardType.SJA5
+        mock_ad = Mock()
+        mock_ad.apdu = [0x00, 0x00, 0x00, 0x02]
+        cm.card.sim.read_binary.return_value = mock_ad
+
+        ok, mismatches = cm.verify_card({"IMSI": "001010000000001"})
+        self.assertFalse(ok)
+        self.assertIn("IMSI", mismatches[0])
+
+
+class TestCardManagerReadData(unittest.TestCase):
+    """Test reading card data."""
+
+    def test_read_not_authenticated(self):
+        cm = CardManager()
+        self.assertIsNone(cm.read_card_data())
+
+    def test_read_card_data_success(self):
+        cm = CardManager()
+        cm.authenticated = True
+        cm.card = Mock()
+        cm.card_type = CardType.SJA5
+        cm.card.sim.card.get_imsi.return_value = "240010000167270"
+        cm.card.sim.card.get_ICCID.return_value = "8949440000001672706"
+
+        mock_ad = Mock()
+        mock_ad.apdu = [0x00, 0x00, 0x00, 0x02]
+        cm.card.sim.read_binary.return_value = mock_ad
+
+        data = cm.read_card_data()
+
+        self.assertIsNotNone(data)
+        self.assertEqual(data['imsi'], "240010000167270")
+        self.assertEqual(data['iccid'], "8949440000001672706")
+        self.assertEqual(data['mnc_length'], 2)
+        self.assertEqual(data['card_type'], 'SJA5')
+
+    def test_read_card_data_partial_failure(self):
+        cm = CardManager()
+        cm.authenticated = True
+        cm.card = Mock()
+        cm.card_type = CardType.SJA5
+        cm.card.sim.card.get_imsi.side_effect = Exception("Read error")
+        cm.card.sim.card.get_ICCID.return_value = "8949440000001672706"
+        cm.card.sim.read_binary.side_effect = Exception("EF_AD error")
+
+        data = cm.read_card_data()
+
+        self.assertIsNotNone(data)
+        self.assertIsNone(data['imsi'])
+        self.assertEqual(data['iccid'], "8949440000001672706")
+
+
+class TestCardManagerGetRemainingAttempts(unittest.TestCase):
+
+    def test_no_card(self):
+        cm = CardManager()
+        self.assertIsNone(cm.get_remaining_attempts())
+
+    def test_with_card(self):
+        cm = CardManager()
+        cm.card = Mock()
+        cm.card.sim.chv_retrys.return_value = 3
+
+        result = cm.get_remaining_attempts()
+        self.assertEqual(result, 3)
+
+
+class TestCardExceptions(unittest.TestCase):
+    """Test custom exception classes."""
+
+    def test_card_error(self):
+        with self.assertRaises(CardError):
+            raise CardError("test")
+
+    def test_card_not_present(self):
+        with self.assertRaises(CardNotPresentError):
+            raise CardNotPresentError("no card")
+
+    def test_card_auth_error(self):
+        err = CardAuthenticationError(2)
+        self.assertEqual(err.remaining_attempts, 2)
+        self.assertIn("2", str(err))
+
+    def test_card_lock_error(self):
+        with self.assertRaises(CardLockError):
+            raise CardLockError("locked")
 
 
 if __name__ == '__main__':

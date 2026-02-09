@@ -1,422 +1,400 @@
 """
-Comprehensive test suite for utils/validators.py
-Achieves >95% code coverage for validation functions
+Tests for utils/validators.py - the REAL Validators class and DEFAULT_VALUES.
 """
 
 import unittest
-from unittest.mock import Mock, patch
+import sys
+import os
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from utils.validators import Validators, ValidationError, DEFAULT_VALUES
 
 
-class TestValidators(unittest.TestCase):
-    """Test suite for data validators"""
+class TestValidateIMSI(unittest.TestCase):
 
-    def test_validate_imsi_valid(self):
-        """Test IMSI validation with valid inputs"""
-        # Valid 15-digit IMSI
-        self.assertTrue(validate_imsi("001010000000001"))
-        self.assertTrue(validate_imsi("310410123456789"))
-        self.assertTrue(validate_imsi("901700000000001"))
-        
-    def test_validate_imsi_invalid_length(self):
-        """Test IMSI validation with invalid lengths"""
-        # Too short
-        self.assertFalse(validate_imsi("00101000000000"))
-        self.assertFalse(validate_imsi("12345"))
-        
-        # Too long
-        self.assertFalse(validate_imsi("0010100000000001"))
-        self.assertFalse(validate_imsi("12345678901234567"))
-        
-    def test_validate_imsi_invalid_characters(self):
-        """Test IMSI validation with non-digit characters"""
-        self.assertFalse(validate_imsi("00101000000000A"))
-        self.assertFalse(validate_imsi("001010000000 01"))
-        self.assertFalse(validate_imsi("001010000000-01"))
-        self.assertFalse(validate_imsi(""))
-        
-    def test_validate_imsi_none(self):
-        """Test IMSI validation with None"""
-        self.assertFalse(validate_imsi(None))
+    def test_valid_15_digits(self):
+        ok, err = Validators.validate_imsi("001010000000001")
+        self.assertTrue(ok)
+        self.assertIsNone(err)
 
-    def test_validate_iccid_valid(self):
-        """Test ICCID validation with valid inputs"""
-        # Valid 19-digit ICCID
-        self.assertTrue(validate_iccid("8988211000000000001"))
-        
-        # Valid 20-digit ICCID
-        self.assertTrue(validate_iccid("89882110000000000001"))
-        
-    def test_validate_iccid_invalid_length(self):
-        """Test ICCID validation with invalid lengths"""
-        # Too short
-        self.assertFalse(validate_iccid("898821100000000000"))
-        
-        # Too long
-        self.assertFalse(validate_iccid("898821100000000000011"))
-        
-    def test_validate_iccid_invalid_characters(self):
-        """Test ICCID validation with non-digit characters"""
-        self.assertFalse(validate_iccid("8988211000000000A01"))
-        self.assertFalse(validate_iccid(""))
-        
-    def test_validate_iccid_none(self):
-        """Test ICCID validation with None"""
-        self.assertFalse(validate_iccid(None))
+    def test_valid_swedish_imsi(self):
+        ok, _ = Validators.validate_imsi("240010000167270")
+        self.assertTrue(ok)
 
-    def test_validate_hex_key_valid(self):
-        """Test hex key validation with valid inputs"""
-        # Valid 32 hex chars (16 bytes)
-        self.assertTrue(validate_hex_key("00112233445566778899AABBCCDDEEFF", 16))
-        self.assertTrue(validate_hex_key("00112233445566778899aabbccddeeff", 16))
-        
-        # Valid 64 hex chars (32 bytes)
-        self.assertTrue(validate_hex_key(
-            "00112233445566778899AABBCCDDEEFF00112233445566778899AABBCCDDEEFF",
-            32
-        ))
-        
-    def test_validate_hex_key_invalid_length(self):
-        """Test hex key validation with invalid lengths"""
-        # Too short
-        self.assertFalse(validate_hex_key("00112233445566778899AABBCCDDEE", 16))
-        
-        # Too long
-        self.assertFalse(validate_hex_key("00112233445566778899AABBCCDDEEFF00", 16))
-        
-    def test_validate_hex_key_invalid_characters(self):
-        """Test hex key validation with invalid hex characters"""
-        self.assertFalse(validate_hex_key("00112233445566778899AABBCCDDEEGG", 16))
-        self.assertFalse(validate_hex_key("00112233445566778899AABBCCDDEEF ", 16))
-        self.assertFalse(validate_hex_key("", 16))
-        
-    def test_validate_hex_key_none(self):
-        """Test hex key validation with None"""
-        self.assertFalse(validate_hex_key(None, 16))
+    def test_empty(self):
+        ok, err = Validators.validate_imsi("")
+        self.assertFalse(ok)
 
-    def test_validate_algorithm_valid(self):
-        """Test algorithm validation with valid inputs"""
-        valid_algos = [
-            "COMP128v1", "COMP128v2", "COMP128v3",
-            "MILENAGE", "SHA1-AKA", "XOR", "XOR-2G", "TUAK"
-        ]
-        for algo in valid_algos:
-            self.assertTrue(validate_algorithm(algo))
-            
-    def test_validate_algorithm_invalid(self):
-        """Test algorithm validation with invalid inputs"""
-        self.assertFalse(validate_algorithm("INVALID"))
-        self.assertFalse(validate_algorithm(""))
-        self.assertFalse(validate_algorithm(None))
-        self.assertFalse(validate_algorithm("milenage"))  # case sensitive
+    def test_none_string(self):
+        ok, err = Validators.validate_imsi(None)
+        self.assertFalse(ok)
 
-    def test_validate_mnc_length_valid(self):
-        """Test MNC length validation with valid inputs"""
-        self.assertTrue(validate_mnc_length(2))
-        self.assertTrue(validate_mnc_length(3))
-        self.assertTrue(validate_mnc_length("2"))
-        self.assertTrue(validate_mnc_length("3"))
-        
-    def test_validate_mnc_length_invalid(self):
-        """Test MNC length validation with invalid inputs"""
-        self.assertFalse(validate_mnc_length(1))
-        self.assertFalse(validate_mnc_length(4))
-        self.assertFalse(validate_mnc_length("1"))
-        self.assertFalse(validate_mnc_length("4"))
-        self.assertFalse(validate_mnc_length(None))
-        self.assertFalse(validate_mnc_length(""))
+    def test_too_short(self):
+        ok, err = Validators.validate_imsi("24001000016727")
+        self.assertFalse(ok)
 
-    def test_validate_adm1_valid(self):
-        """Test ADM1 key validation with valid inputs"""
-        self.assertTrue(validate_adm1("12345678"))
-        self.assertTrue(validate_adm1("00000000"))
-        self.assertTrue(validate_adm1("99999999"))
-        
-    def test_validate_adm1_invalid_length(self):
-        """Test ADM1 validation with invalid lengths"""
-        self.assertFalse(validate_adm1("1234567"))
-        self.assertFalse(validate_adm1("123456789"))
-        
-    def test_validate_adm1_invalid_characters(self):
-        """Test ADM1 validation with non-digit characters"""
-        self.assertFalse(validate_adm1("1234567A"))
-        self.assertFalse(validate_adm1(""))
-        self.assertFalse(validate_adm1(None))
+    def test_too_long(self):
+        ok, err = Validators.validate_imsi("2400100001672700")
+        self.assertFalse(ok)
 
-    def test_validate_hplmn_valid(self):
-        """Test HPLMN validation with valid inputs"""
-        # 5-digit HPLMN (MCC + 2-digit MNC)
-        self.assertTrue(validate_hplmn("24001"))
-        
-        # 6-digit HPLMN (MCC + 3-digit MNC)
-        self.assertTrue(validate_hplmn("310410"))
-        
-    def test_validate_hplmn_invalid(self):
-        """Test HPLMN validation with invalid inputs"""
-        self.assertFalse(validate_hplmn("2400"))  # Too short
-        self.assertFalse(validate_hplmn("2400123"))  # Too long
-        self.assertFalse(validate_hplmn("24A01"))  # Invalid char
-        self.assertFalse(validate_hplmn(""))
-        self.assertFalse(validate_hplmn(None))
+    def test_non_digit(self):
+        ok, err = Validators.validate_imsi("24001000016727A")
+        self.assertFalse(ok)
 
-    def test_validate_routing_indicator_valid(self):
-        """Test routing indicator validation with valid inputs"""
-        self.assertTrue(validate_routing_indicator("0000"))
-        self.assertTrue(validate_routing_indicator("ABCD"))
-        self.assertTrue(validate_routing_indicator("1234"))
-        
-    def test_validate_routing_indicator_invalid(self):
-        """Test routing indicator validation with invalid inputs"""
-        self.assertFalse(validate_routing_indicator("000"))  # Too short
-        self.assertFalse(validate_routing_indicator("00000"))  # Too long
-        self.assertFalse(validate_routing_indicator("GHIJ"))  # Invalid hex
-        self.assertFalse(validate_routing_indicator(""))
-        self.assertFalse(validate_routing_indicator(None))
 
-    def test_validate_protection_scheme_id_valid(self):
-        """Test protection scheme ID validation with valid inputs"""
-        self.assertTrue(validate_protection_scheme_id(0))
-        self.assertTrue(validate_protection_scheme_id(1))
-        self.assertTrue(validate_protection_scheme_id(2))
-        self.assertTrue(validate_protection_scheme_id("0"))
-        self.assertTrue(validate_protection_scheme_id("1"))
-        self.assertTrue(validate_protection_scheme_id("2"))
-        
-    def test_validate_protection_scheme_id_invalid(self):
-        """Test protection scheme ID validation with invalid inputs"""
-        self.assertFalse(validate_protection_scheme_id(3))
-        self.assertFalse(validate_protection_scheme_id(-1))
-        self.assertFalse(validate_protection_scheme_id("3"))
-        self.assertFalse(validate_protection_scheme_id(""))
-        self.assertFalse(validate_protection_scheme_id(None))
+class TestValidateICCID(unittest.TestCase):
 
-    def test_validate_csv_row_complete_valid(self):
-        """Test complete CSV row validation with valid data"""
-        valid_row = {
+    def test_valid_19_digits(self):
+        ok, _ = Validators.validate_iccid("8949440000001672706")
+        self.assertTrue(ok)
+
+    def test_valid_20_digits(self):
+        ok, _ = Validators.validate_iccid("89494400000016727060")
+        self.assertTrue(ok)
+
+    def test_empty(self):
+        ok, _ = Validators.validate_iccid("")
+        self.assertFalse(ok)
+
+    def test_too_short(self):
+        ok, _ = Validators.validate_iccid("894944000000167270")
+        self.assertFalse(ok)
+
+    def test_non_digit(self):
+        ok, _ = Validators.validate_iccid("8949440000001672A06")
+        self.assertFalse(ok)
+
+
+class TestValidateKi(unittest.TestCase):
+
+    def test_valid_128bit(self):
+        ok, _ = Validators.validate_ki("FD4241E9C53B40E6E14107F19DF7C93E")
+        self.assertTrue(ok)
+
+    def test_valid_256bit(self):
+        ok, _ = Validators.validate_ki("A" * 64)
+        self.assertTrue(ok)
+
+    def test_empty(self):
+        ok, _ = Validators.validate_ki("")
+        self.assertFalse(ok)
+
+    def test_wrong_length(self):
+        ok, _ = Validators.validate_ki("ABCD")
+        self.assertFalse(ok)
+
+    def test_invalid_hex(self):
+        ok, _ = Validators.validate_ki("G" * 32)
+        self.assertFalse(ok)
+
+
+class TestValidateOPc(unittest.TestCase):
+
+    def test_valid_milenage(self):
+        ok, _ = Validators.validate_opc("BC435ACD7123201B19A2D065B65EB5DA", "MILENAGE")
+        self.assertTrue(ok)
+
+    def test_valid_tuak(self):
+        ok, _ = Validators.validate_opc("A" * 64, "TUAK")
+        self.assertTrue(ok)
+
+    def test_not_required_for_xor(self):
+        ok, _ = Validators.validate_opc("", "XOR")
+        self.assertTrue(ok)
+
+    def test_required_for_milenage(self):
+        ok, err = Validators.validate_opc("", "MILENAGE")
+        self.assertFalse(ok)
+        self.assertIn("required", err)
+
+    def test_required_for_sha1aka(self):
+        ok, _ = Validators.validate_opc("", "SHA1-AKA")
+        self.assertFalse(ok)
+
+
+class TestValidateAlgorithm(unittest.TestCase):
+
+    def test_all_sja5_algorithms(self):
+        for algo in Validators.ALGORITHMS_SJA5:
+            ok, _ = Validators.validate_algorithm(algo, "SJA5")
+            self.assertTrue(ok, f"Algorithm {algo} should be valid for SJA5")
+
+    def test_tuak_not_valid_for_sja2(self):
+        ok, _ = Validators.validate_algorithm("TUAK", "SJA2")
+        self.assertFalse(ok)
+
+    def test_empty(self):
+        ok, _ = Validators.validate_algorithm("")
+        self.assertFalse(ok)
+
+    def test_invalid_name(self):
+        ok, _ = Validators.validate_algorithm("INVALID")
+        self.assertFalse(ok)
+
+    def test_sjs1_algorithms(self):
+        for algo in Validators.ALGORITHMS_SJS1:
+            ok, _ = Validators.validate_algorithm(algo, "SJS1")
+            self.assertTrue(ok)
+
+
+class TestValidateMNCLength(unittest.TestCase):
+
+    def test_valid_values(self):
+        for v in ["1", "2", "3"]:
+            ok, _ = Validators.validate_mnc_length(v)
+            self.assertTrue(ok)
+
+    def test_invalid_value(self):
+        ok, _ = Validators.validate_mnc_length("4")
+        self.assertFalse(ok)
+
+    def test_empty(self):
+        ok, _ = Validators.validate_mnc_length("")
+        self.assertFalse(ok)
+
+    def test_non_numeric(self):
+        ok, _ = Validators.validate_mnc_length("abc")
+        self.assertFalse(ok)
+
+
+class TestValidateBoolean(unittest.TestCase):
+
+    def test_valid_values(self):
+        for v in ["0", "1", "true", "false", "yes", "no"]:
+            ok, _ = Validators.validate_boolean(v, "test")
+            self.assertTrue(ok, f"'{v}' should be valid")
+
+    def test_empty_is_optional(self):
+        ok, _ = Validators.validate_boolean("", "test")
+        self.assertTrue(ok)
+
+    def test_invalid(self):
+        ok, _ = Validators.validate_boolean("maybe", "test")
+        self.assertFalse(ok)
+
+
+class TestValidateIntegerRange(unittest.TestCase):
+
+    def test_in_range(self):
+        ok, _ = Validators.validate_integer_range("5", "test", 1, 10)
+        self.assertTrue(ok)
+
+    def test_out_of_range(self):
+        ok, _ = Validators.validate_integer_range("15", "test", 1, 10)
+        self.assertFalse(ok)
+
+    def test_empty_is_optional(self):
+        ok, _ = Validators.validate_integer_range("", "test", 1, 10)
+        self.assertTrue(ok)
+
+    def test_non_numeric(self):
+        ok, _ = Validators.validate_integer_range("abc", "test", 1, 10)
+        self.assertFalse(ok)
+
+
+class TestValidateMilenageParams(unittest.TestCase):
+
+    def test_valid_r_param(self):
+        ok, _ = Validators.validate_milenage_r("40", "R1")
+        self.assertTrue(ok)
+
+    def test_empty_r_is_optional(self):
+        ok, _ = Validators.validate_milenage_r("", "R1")
+        self.assertTrue(ok)
+
+    def test_invalid_r_hex(self):
+        ok, _ = Validators.validate_milenage_r("GG", "R1")
+        self.assertFalse(ok)
+
+    def test_valid_c_param(self):
+        ok, _ = Validators.validate_milenage_c("0" * 32, "C1")
+        self.assertTrue(ok)
+
+    def test_empty_c_is_optional(self):
+        ok, _ = Validators.validate_milenage_c("", "C1")
+        self.assertTrue(ok)
+
+
+class TestValidatePLMN(unittest.TestCase):
+
+    def test_valid_5_digit(self):
+        ok, _ = Validators.validate_plmn("24001")
+        self.assertTrue(ok)
+
+    def test_valid_6_digit(self):
+        ok, _ = Validators.validate_plmn("310410")
+        self.assertTrue(ok)
+
+    def test_empty_is_optional(self):
+        ok, _ = Validators.validate_plmn("")
+        self.assertTrue(ok)
+
+    def test_too_short(self):
+        ok, _ = Validators.validate_plmn("2400")
+        self.assertFalse(ok)
+
+    def test_too_long(self):
+        ok, _ = Validators.validate_plmn("2400100")
+        self.assertFalse(ok)
+
+    def test_non_digit(self):
+        ok, _ = Validators.validate_plmn("24A01")
+        self.assertFalse(ok)
+
+
+class TestValidate5GParams(unittest.TestCase):
+
+    def test_valid_routing_indicator(self):
+        ok, _ = Validators.validate_routing_indicator("0000")
+        self.assertTrue(ok)
+
+    def test_valid_routing_hex(self):
+        ok, _ = Validators.validate_routing_indicator("ABCD")
+        self.assertTrue(ok)
+
+    def test_invalid_routing_length(self):
+        ok, _ = Validators.validate_routing_indicator("000")
+        self.assertFalse(ok)
+
+    def test_empty_routing_optional(self):
+        ok, _ = Validators.validate_routing_indicator("")
+        self.assertTrue(ok)
+
+    def test_valid_hnet_pubkey(self):
+        ok, _ = Validators.validate_hnet_pubkey("0e6e6e15b5d20b0aa382ef1b5277a780bfd061cd9b94cf7ee1200faaea5da53f")
+        self.assertTrue(ok)
+
+    def test_empty_hnet_optional(self):
+        ok, _ = Validators.validate_hnet_pubkey("")
+        self.assertTrue(ok)
+
+    def test_invalid_hnet_length(self):
+        ok, _ = Validators.validate_hnet_pubkey("ABCD")
+        self.assertFalse(ok)
+
+    def test_valid_protection_scheme(self):
+        for v in ["0", "1", "2"]:
+            ok, _ = Validators.validate_protection_scheme(v)
+            self.assertTrue(ok)
+
+    def test_invalid_protection_scheme(self):
+        ok, _ = Validators.validate_protection_scheme("3")
+        self.assertFalse(ok)
+
+
+class TestValidateTUAKParams(unittest.TestCase):
+
+    def test_valid_res_sizes(self):
+        for v in ["32", "64", "128", "256"]:
+            ok, _ = Validators.validate_tuak_res_size(v)
+            self.assertTrue(ok)
+
+    def test_invalid_res_size(self):
+        ok, _ = Validators.validate_tuak_res_size("100")
+        self.assertFalse(ok)
+
+    def test_valid_mac_sizes(self):
+        for v in ["64", "128", "256"]:
+            ok, _ = Validators.validate_tuak_mac_size(v)
+            self.assertTrue(ok)
+
+    def test_valid_ckik_sizes(self):
+        for v in ["128", "256"]:
+            ok, _ = Validators.validate_tuak_ckik_size(v)
+            self.assertTrue(ok)
+
+    def test_invalid_ckik_size(self):
+        ok, _ = Validators.validate_tuak_ckik_size("64")
+        self.assertFalse(ok)
+
+
+class TestValidateRow(unittest.TestCase):
+    """Test full row validation."""
+
+    def test_valid_complete_row(self):
+        row = {
             "IMSI": "001010000000001",
             "ICCID": "8988211000000000001",
             "Ki": "00112233445566778899AABBCCDDEEFF",
             "OPc": "ABCDEF0123456789ABCDEF0123456789",
             "ALGO_2G": "MILENAGE",
             "ALGO_3G": "MILENAGE",
-            "ALGO_4G5G": "MILENAGE",
             "MNC_LENGTH": "2",
-            "USE_OPC": "1",
-            "HPLMN": "24001"
         }
-        is_valid, errors = validate_csv_row(valid_row)
-        self.assertTrue(is_valid)
+        errors = Validators.validate_row(row, 2, "SJA5")
         self.assertEqual(len(errors), 0)
 
-    def test_validate_csv_row_missing_required(self):
-        """Test CSV row validation with missing required fields"""
-        invalid_row = {
-            "IMSI": "001010000000001",
-            # Missing ICCID
-            "Ki": "00112233445566778899AABBCCDDEEFF",
+    def test_invalid_row_multiple_errors(self):
+        row = {
+            "IMSI": "001010",
+            "ICCID": "invalid",
+            "Ki": "short",
+            "ALGO_2G": "INVALID",
+            "ALGO_3G": "MILENAGE",
+            "MNC_LENGTH": "5",
         }
-        is_valid, errors = validate_csv_row(invalid_row)
-        self.assertFalse(is_valid)
-        self.assertIn("ICCID", str(errors))
+        errors = Validators.validate_row(row, 2, "SJA5")
+        self.assertGreater(len(errors), 3)
 
-    def test_validate_csv_row_invalid_values(self):
-        """Test CSV row validation with invalid field values"""
-        invalid_row = {
-            "IMSI": "001010000000",  # Too short
-            "ICCID": "8988211000000000001",
-            "Ki": "00112233445566778899AABBCCDDEEFF",
-            "OPc": "INVALID_HEX_KEY",  # Invalid hex
-            "ALGO_2G": "INVALID_ALGO",  # Invalid algorithm
-            "MNC_LENGTH": "5",  # Invalid MNC length
-        }
-        is_valid, errors = validate_csv_row(invalid_row)
-        self.assertFalse(is_valid)
+    def test_validation_error_attributes(self):
+        row = {"IMSI": "bad", "ICCID": "8988211000000000001", "Ki": "A" * 32,
+               "ALGO_2G": "MILENAGE", "ALGO_3G": "MILENAGE", "MNC_LENGTH": "2"}
+        errors = Validators.validate_row(row, 5, "SJA5")
         self.assertGreater(len(errors), 0)
+        self.assertEqual(errors[0].row, 5)
+        self.assertEqual(errors[0].column, "IMSI")
 
-    def test_validate_csv_row_5g_suci_complete(self):
-        """Test CSV row with complete 5G SUCI parameters"""
-        valid_5g_row = {
+    def test_tuak_params_validated_for_sja5(self):
+        row = {
             "IMSI": "001010000000001",
             "ICCID": "8988211000000000001",
-            "Ki": "00112233445566778899AABBCCDDEEFF",
-            "OPc": "ABCDEF0123456789ABCDEF0123456789",
-            "ALGO_4G5G": "MILENAGE",
+            "Ki": "A" * 32,
+            "ALGO_2G": "MILENAGE",
+            "ALGO_3G": "MILENAGE",
             "MNC_LENGTH": "2",
-            "HPLMN": "24001",
-            "ROUTING_INDICATOR": "0000",
-            "PROTECTION_SCHEME_ID": "1",
-            "HNET_PUBKEY_ID": "1",
-            "HNET_PUBKEY": "A" * 64  # 32 bytes in hex
+            "TUAK_RES_SIZE": "999",  # Invalid
         }
-        is_valid, errors = validate_csv_row(valid_5g_row)
-        self.assertTrue(is_valid)
+        errors = Validators.validate_row(row, 2, "SJA5")
+        tuak_errors = [e for e in errors if "TUAK" in e.column]
+        self.assertGreater(len(tuak_errors), 0)
 
 
-class TestHexConversion(unittest.TestCase):
-    """Test hex conversion utilities"""
+class TestValidationError(unittest.TestCase):
 
-    def test_hex_to_bytes(self):
-        """Test hex string to bytes conversion"""
-        self.assertEqual(hex_to_bytes("00FF"), b'\x00\xFF')
-        self.assertEqual(hex_to_bytes("AABBCC"), b'\xAA\xBB\xCC')
-        
-    def test_bytes_to_hex(self):
-        """Test bytes to hex string conversion"""
-        self.assertEqual(bytes_to_hex(b'\x00\xFF'), "00FF")
-        self.assertEqual(bytes_to_hex(b'\xAA\xBB\xCC'), "AABBCC")
+    def test_attributes(self):
+        err = ValidationError(5, "IMSI", "too short")
+        self.assertEqual(err.row, 5)
+        self.assertEqual(err.column, "IMSI")
+        self.assertEqual(err.message, "too short")
+        self.assertIn("Row 5", str(err))
+        self.assertIn("IMSI", str(err))
 
-
-class TestIMSIExtraction(unittest.TestCase):
-    """Test IMSI extraction utilities"""
-
-    def test_extract_mcc_mnc_2digit(self):
-        """Test MCC/MNC extraction with 2-digit MNC"""
-        mcc, mnc = extract_mcc_mnc("001010000000001", mnc_length=2)
-        self.assertEqual(mcc, "001")
-        self.assertEqual(mnc, "01")
-        
-    def test_extract_mcc_mnc_3digit(self):
-        """Test MCC/MNC extraction with 3-digit MNC"""
-        mcc, mnc = extract_mcc_mnc("310410123456789", mnc_length=3)
-        self.assertEqual(mcc, "310")
-        self.assertEqual(mnc, "410")
+    def test_is_exception(self):
+        with self.assertRaises(ValidationError):
+            raise ValidationError(1, "Ki", "invalid")
 
 
-# Mock implementations for functions that may not exist yet
-def validate_imsi(imsi):
-    """Validate IMSI format"""
-    if not imsi or not isinstance(imsi, str):
-        return False
-    return len(imsi) == 15 and imsi.isdigit()
+class TestDefaultValues(unittest.TestCase):
 
+    def test_required_defaults_present(self):
+        for key in ["USE_OPC", "ALGO_2G", "ALGO_3G", "ALGO_4G5G", "MNC_LENGTH"]:
+            self.assertIn(key, DEFAULT_VALUES)
 
-def validate_iccid(iccid):
-    """Validate ICCID format"""
-    if not iccid or not isinstance(iccid, str):
-        return False
-    return len(iccid) in (19, 20) and iccid.isdigit()
+    def test_milenage_defaults(self):
+        for i in range(1, 6):
+            self.assertIn(f"MILENAGE_R{i}", DEFAULT_VALUES)
+            self.assertIn(f"MILENAGE_C{i}", DEFAULT_VALUES)
 
+    def test_5g_defaults(self):
+        self.assertIn("ROUTING_INDICATOR", DEFAULT_VALUES)
+        self.assertIn("PROTECTION_SCHEME_ID", DEFAULT_VALUES)
+        self.assertIn("HNET_PUBKEY_ID", DEFAULT_VALUES)
+        self.assertIn("HNET_PUBKEY", DEFAULT_VALUES)
 
-def validate_hex_key(key, expected_bytes):
-    """Validate hex key format"""
-    if not key or not isinstance(key, str):
-        return False
-    if len(key) != expected_bytes * 2:
-        return False
-    try:
-        int(key, 16)
-        return True
-    except ValueError:
-        return False
-
-
-def validate_algorithm(algo):
-    """Validate algorithm name"""
-    valid_algos = [
-        "COMP128v1", "COMP128v2", "COMP128v3",
-        "MILENAGE", "SHA1-AKA", "XOR", "XOR-2G", "TUAK"
-    ]
-    return algo in valid_algos
-
-
-def validate_mnc_length(length):
-    """Validate MNC length"""
-    try:
-        length_int = int(length)
-        return length_int in (2, 3)
-    except (ValueError, TypeError):
-        return False
-
-
-def validate_adm1(adm1):
-    """Validate ADM1 key"""
-    if not adm1 or not isinstance(adm1, str):
-        return False
-    return len(adm1) == 8 and adm1.isdigit()
-
-
-def validate_hplmn(hplmn):
-    """Validate HPLMN format"""
-    if not hplmn or not isinstance(hplmn, str):
-        return False
-    return len(hplmn) in (5, 6) and hplmn.isdigit()
-
-
-def validate_routing_indicator(ri):
-    """Validate routing indicator"""
-    if not ri or not isinstance(ri, str):
-        return False
-    if len(ri) != 4:
-        return False
-    try:
-        int(ri, 16)
-        return True
-    except ValueError:
-        return False
-
-
-def validate_protection_scheme_id(scheme_id):
-    """Validate protection scheme ID"""
-    try:
-        scheme_int = int(scheme_id)
-        return scheme_int in (0, 1, 2)
-    except (ValueError, TypeError):
-        return False
-
-
-def validate_csv_row(row):
-    """Validate complete CSV row"""
-    errors = []
-    
-    # Required fields
-    required = ["IMSI", "ICCID", "Ki"]
-    for field in required:
-        if field not in row:
-            errors.append(f"Missing required field: {field}")
-            
-    # Validate IMSI
-    if "IMSI" in row and not validate_imsi(row["IMSI"]):
-        errors.append("Invalid IMSI")
-        
-    # Validate ICCID
-    if "ICCID" in row and not validate_iccid(row["ICCID"]):
-        errors.append("Invalid ICCID")
-        
-    # Validate Ki
-    if "Ki" in row and not validate_hex_key(row["Ki"], 16):
-        errors.append("Invalid Ki")
-        
-    # Validate OPc if present
-    if "OPc" in row and row["OPc"] and not validate_hex_key(row["OPc"], 16):
-        errors.append("Invalid OPc")
-        
-    # Validate algorithms
-    for algo_field in ["ALGO_2G", "ALGO_3G", "ALGO_4G5G"]:
-        if algo_field in row and row[algo_field]:
-            if not validate_algorithm(row[algo_field]):
-                errors.append(f"Invalid {algo_field}")
-                
-    # Validate MNC length
-    if "MNC_LENGTH" in row and not validate_mnc_length(row["MNC_LENGTH"]):
-        errors.append("Invalid MNC_LENGTH")
-        
-    return len(errors) == 0, errors
-
-
-def hex_to_bytes(hex_str):
-    """Convert hex string to bytes"""
-    return bytes.fromhex(hex_str)
-
-
-def bytes_to_hex(data):
-    """Convert bytes to hex string"""
-    return data.hex().upper()
-
-
-def extract_mcc_mnc(imsi, mnc_length=2):
-    """Extract MCC and MNC from IMSI"""
-    mcc = imsi[:3]
-    mnc = imsi[3:3+mnc_length]
-    return mcc, mnc
+    def test_default_algo_is_milenage(self):
+        self.assertEqual(DEFAULT_VALUES["ALGO_2G"], "MILENAGE")
+        self.assertEqual(DEFAULT_VALUES["ALGO_3G"], "MILENAGE")
 
 
 if __name__ == '__main__':
