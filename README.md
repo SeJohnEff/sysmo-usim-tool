@@ -93,6 +93,12 @@ pip3 install pyscard
 pip3 install pyscard
 ```
 
+#### pytlv (TLV Parser)
+Required for USIM file operations (TLV parsing in simcard.py):
+```bash
+pip3 install pytlv
+```
+
 #### Verify pyscard installation:
 ```bash
 python3 -c "from smartcard.System import readers; print(readers())"
@@ -107,11 +113,12 @@ git clone https://github.com/SeJohnEff/sysmo-usim-tool.git
 cd sysmo-usim-tool
 ```
 
-### 2. Install System Dependencies
+### 2. Install Dependencies
 ```bash
 # Ubuntu/Debian
 sudo apt-get install python3-pyscard python3-tk pcscd pcsc-tools
 sudo systemctl start pcscd
+pip3 install pytlv
 
 # Verify card reader is detected
 pcsc_scan
