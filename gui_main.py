@@ -177,12 +177,34 @@ class SysmoUSIMToolGUI:
         self.root.bind_class('Text', '<Control-v>', self._paste_clipboard)
         self.root.bind_class('Text', '<Control-c>', self._copy_clipboard)
 
+        # macOS Command key bindings
+        self.root.bind_class('Entry', '<Command-v>', self._paste_clipboard)
+        self.root.bind_class('Entry', '<Command-c>', self._copy_clipboard)
+        self.root.bind_class('Entry', '<Command-x>', self._cut_clipboard)
+        self.root.bind_class('Entry', '<Command-a>', self._select_all)
+        self.root.bind_class('Text', '<Command-v>', self._paste_clipboard)
+        self.root.bind_class('Text', '<Command-c>', self._copy_clipboard)
+
+        # Right-click context menu
+        self.root.bind_class('Entry', '<Button-3>', self._show_context_menu)
+        self.root.bind_class('Entry', '<Button-2>', self._show_context_menu)  # macOS
+        self.root.bind_class('Text', '<Button-3>', self._show_context_menu)
+        self.root.bind_class('Text', '<Button-2>', self._show_context_menu)
+        self.root.bind_class('TLabel', '<Button-3>', self._show_label_context_menu)
+        self.root.bind_class('TLabel', '<Button-2>', self._show_label_context_menu)
+
+    @staticmethod
+    def _sanitize_clipboard(text):
+        """Strip non-printable/control characters from clipboard text"""
+        return ''.join(ch for ch in text if ch.isprintable())
+
     @staticmethod
     def _paste_clipboard(event):
         """Paste from clipboard into focused widget"""
         try:
             widget = event.widget
             text = widget.clipboard_get()
+            text = SysmoUSIMToolGUI._sanitize_clipboard(text)
             if widget.select_present() if hasattr(widget, 'select_present') else False:
                 widget.delete(tk.SEL_FIRST, tk.SEL_LAST)
             widget.insert(tk.INSERT, text)
@@ -222,6 +244,49 @@ class SysmoUSIMToolGUI:
         """Select all text in entry"""
         event.widget.select_range(0, tk.END)
         return 'break'
+
+    def _show_context_menu(self, event):
+        """Show right-click context menu for editable widgets"""
+        widget = event.widget
+        menu = tk.Menu(self.root, tearoff=0)
+
+        has_selection = False
+        try:
+            widget.selection_get()
+            has_selection = True
+        except tk.TclError:
+            pass
+
+        is_editable = True
+        if isinstance(widget, ttk.Entry):
+            is_editable = str(widget.cget('state')) != 'disabled'
+
+        menu.add_command(label="Copy", command=lambda: self._copy_clipboard(event),
+                         state=tk.NORMAL if has_selection else tk.DISABLED)
+        if is_editable:
+            menu.add_command(label="Cut", command=lambda: self._cut_clipboard(event),
+                             state=tk.NORMAL if has_selection else tk.DISABLED)
+            menu.add_command(label="Paste", command=lambda: self._paste_clipboard(event))
+            menu.add_separator()
+            menu.add_command(label="Select All", command=lambda: self._select_all(event))
+
+        menu.tk_popup(event.x_root, event.y_root)
+
+    def _show_label_context_menu(self, event):
+        """Show right-click context menu for labels (copy only)"""
+        widget = event.widget
+        text = widget.cget('text')
+        if not text or text == '-':
+            return
+
+        menu = tk.Menu(self.root, tearoff=0)
+        menu.add_command(label="Copy", command=lambda: self._copy_label_text(text))
+        menu.tk_popup(event.x_root, event.y_root)
+
+    def _copy_label_text(self, text):
+        """Copy label text to clipboard"""
+        self.root.clipboard_clear()
+        self.root.clipboard_append(text)
 
     def log(self, message: str, level: str = "INFO"):
         """Add message to log"""

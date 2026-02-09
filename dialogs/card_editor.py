@@ -44,6 +44,7 @@ class CardEditorDialog(tk.Toplevel):
         self.validation_errors = {}
 
         self._create_widgets()
+        self._setup_clipboard()
         self._update_validation()
 
     def _create_widgets(self):
@@ -513,6 +514,68 @@ class CardEditorDialog(tk.Toplevel):
 
         except Exception as e:
             messagebox.showerror("Error", f"Failed to save file:\n{e}")
+
+    def _setup_clipboard(self):
+        """Setup clipboard bindings with sanitization for this dialog"""
+        for event_key in ('<Control-v>', '<Command-v>'):
+            self.bind_class('Entry', event_key, self._paste_sanitized)
+        for event_key in ('<Control-c>', '<Command-c>'):
+            self.bind_class('Entry', event_key, self._copy_from_entry)
+        for event_key in ('<Control-a>', '<Command-a>'):
+            self.bind_class('Entry', event_key, self._select_all_entry)
+        self.bind_class('Entry', '<Button-3>', self._show_entry_context_menu)
+        self.bind_class('Entry', '<Button-2>', self._show_entry_context_menu)
+
+    def _paste_sanitized(self, event):
+        """Paste from clipboard, stripping non-printable characters"""
+        try:
+            widget = event.widget
+            text = widget.clipboard_get()
+            text = ''.join(ch for ch in text if ch.isprintable())
+            if hasattr(widget, 'select_present') and widget.select_present():
+                widget.delete(tk.SEL_FIRST, tk.SEL_LAST)
+            widget.insert(tk.INSERT, text)
+            return 'break'
+        except tk.TclError:
+            pass
+
+    @staticmethod
+    def _copy_from_entry(event):
+        """Copy selection to clipboard"""
+        try:
+            widget = event.widget
+            if hasattr(widget, 'selection_get'):
+                text = widget.selection_get()
+                widget.clipboard_clear()
+                widget.clipboard_append(text)
+            return 'break'
+        except tk.TclError:
+            pass
+
+    @staticmethod
+    def _select_all_entry(event):
+        """Select all text in entry"""
+        event.widget.select_range(0, tk.END)
+        return 'break'
+
+    def _show_entry_context_menu(self, event):
+        """Show right-click context menu for entry fields"""
+        widget = event.widget
+        menu = tk.Menu(self, tearoff=0)
+
+        has_selection = False
+        try:
+            widget.selection_get()
+            has_selection = True
+        except tk.TclError:
+            pass
+
+        menu.add_command(label="Copy", command=lambda: self._copy_from_entry(event),
+                         state=tk.NORMAL if has_selection else tk.DISABLED)
+        menu.add_command(label="Paste", command=lambda: self._paste_sanitized(event))
+        menu.add_separator()
+        menu.add_command(label="Select All", command=lambda: self._select_all_entry(event))
+        menu.tk_popup(event.x_root, event.y_root)
 
     def _set_field_value(self, field_name, value):
         """Set value of a field and trigger validation"""

@@ -34,8 +34,29 @@ class ADM1Dialog(tk.Toplevel):
         self._create_widgets()
         self._center_window()
 
+        self._setup_clipboard()
+
         # Focus on entry field
         self.adm1_entry.focus()
+
+    def _setup_clipboard(self):
+        """Setup clipboard bindings with sanitization for this dialog"""
+        self.bind_class('Entry', '<Control-v>', self._paste_sanitized)
+        self.bind_class('Entry', '<Command-v>', self._paste_sanitized)
+
+    def _paste_sanitized(self, event):
+        """Paste from clipboard, stripping non-printable characters"""
+        try:
+            widget = event.widget
+            text = widget.clipboard_get()
+            text = ''.join(ch for ch in text if ch.isprintable())
+            if hasattr(widget, 'select_present') and widget.select_present():
+                widget.delete(tk.SEL_FIRST, tk.SEL_LAST)
+            widget.insert(tk.INSERT, text)
+            self._validate_input()
+            return 'break'
+        except tk.TclError:
+            pass
 
     def _create_widgets(self):
         """Create dialog widgets"""

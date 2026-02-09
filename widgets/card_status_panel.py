@@ -57,17 +57,19 @@ class CardStatusPanel(ttk.LabelFrame):
         self.card_type_label = ttk.Label(self, text="Unknown", style='Subheading.TLabel')
         self.card_type_label.grid(row=1, column=1, sticky=tk.W, pady=info_pad)
 
-        # IMSI
+        # IMSI (read-only entry for easy copy)
         ttk.Label(self, text="IMSI:", width=12).grid(
             row=2, column=0, sticky=tk.W, pady=info_pad)
-        self.imsi_label = ttk.Label(self, text="-", foreground=ModernTheme.get_color('disabled'))
-        self.imsi_label.grid(row=2, column=1, sticky=tk.W, pady=info_pad)
+        self.imsi_var = tk.StringVar(value="-")
+        self.imsi_entry = ttk.Entry(self, textvariable=self.imsi_var, state='readonly', width=20)
+        self.imsi_entry.grid(row=2, column=1, sticky=tk.W, pady=info_pad)
 
-        # ICCID
+        # ICCID (read-only entry for easy copy)
         ttk.Label(self, text="ICCID:", width=12).grid(
             row=3, column=0, sticky=tk.W, pady=info_pad)
-        self.iccid_label = ttk.Label(self, text="-", foreground=ModernTheme.get_color('disabled'))
-        self.iccid_label.grid(row=3, column=1, sticky=tk.W, pady=info_pad)
+        self.iccid_var = tk.StringVar(value="-")
+        self.iccid_entry = ttk.Entry(self, textvariable=self.iccid_var, state='readonly', width=24)
+        self.iccid_entry.grid(row=3, column=1, sticky=tk.W, pady=info_pad)
 
         # Authentication status
         ttk.Label(self, text="Auth Status:", width=12).grid(
@@ -127,9 +129,9 @@ class CardStatusPanel(ttk.LabelFrame):
         if card_type:
             self.card_type_label.config(text=card_type)
         if imsi:
-            self.imsi_label.config(text=imsi, foreground="black")
+            self.imsi_var.set(imsi)
         if iccid:
-            self.iccid_label.config(text=iccid, foreground="black")
+            self.iccid_var.set(iccid)
 
     def set_auth_status(self, authenticated: bool, message: str = None):
         """Set authentication status"""
@@ -154,8 +156,8 @@ class CardStatusPanel(ttk.LabelFrame):
         """Reset panel to initial state"""
         self.set_status("waiting", "Waiting for card...")
         self.card_type_label.config(text="Unknown")
-        self.imsi_label.config(text="-", foreground="gray")
-        self.iccid_label.config(text="-", foreground="gray")
+        self.imsi_var.set("-")
+        self.iccid_var.set("-")
         self.auth_label.config(text="Not authenticated", foreground="orange")
         self.detect_button.config(state=tk.NORMAL)
         self.auth_button.config(state=tk.DISABLED)
