@@ -9,6 +9,7 @@ Manual Card Editor Dialog - Read, Edit, Write single cards
 
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
+import csv
 import json
 import sys
 import os
@@ -416,10 +417,11 @@ class CardEditorDialog(tk.Toplevel):
             messagebox.showerror("Error", f"Programming error: {e}")
 
     def _load_file(self):
-        """Load card configuration from file"""
+        """Load card configuration from CSV or JSON file"""
         filename = filedialog.askopenfilename(
             title="Load Card Configuration",
             filetypes=[
+                ("CSV files", "*.csv"),
                 ("JSON files", "*.json"),
                 ("All files", "*.*")
             ]
@@ -429,44 +431,61 @@ class CardEditorDialog(tk.Toplevel):
             return
 
         try:
-            with open(filename, 'r') as f:
-                data = json.load(f)
-
-            # Support both direct format and backup format
-            if 'card_data' in data:
-                # Backup format
-                card_data = data['card_data']
-                # Convert backup format to card editor format
-                if 'authentication' in card_data:
-                    auth = card_data['authentication']
-                    data = {
-                        'IMSI': str(card_data.get('imsi', '')),
-                        'ICCID': str(card_data.get('iccid', '')),
-                        'MNC_LENGTH': str(card_data.get('mnc_length', '2')),
-                        'Ki': auth.get('ki', ''),
-                        'OPc': auth.get('opc', ''),
-                        'USE_OPC': '1' if auth.get('use_opc', True) else '0',
-                        'ALGO_2G': auth.get('algo_2g', 'MILENAGE'),
-                        'ALGO_3G': auth.get('algo_3g', 'MILENAGE'),
-                        'ALGO_4G5G': auth.get('algo_4g5g', 'MILENAGE'),
-                    }
-
-            # Load values into fields
-            for field, value in data.items():
-                self._set_field_value(field, str(value))
+            if filename.lower().endswith('.csv'):
+                self._load_csv_file(filename)
+            else:
+                self._load_json_file(filename)
 
             messagebox.showinfo("Success", f"Configuration loaded from:\n{filename}")
 
         except Exception as e:
             messagebox.showerror("Error", f"Failed to load file:\n{e}")
 
+    def _load_csv_file(self, filename):
+        """Load card configuration from CSV file (first data row)"""
+        with open(filename, 'r', newline='') as f:
+            reader = csv.DictReader(f)
+            row = next(reader, None)
+            if not row:
+                raise ValueError("CSV file has no data rows")
+            for field, value in row.items():
+                if value:
+                    self._set_field_value(field, value)
+
+    def _load_json_file(self, filename):
+        """Load card configuration from JSON file"""
+        with open(filename, 'r') as f:
+            data = json.load(f)
+
+        # Support wrapped format
+        if 'config' in data:
+            data = data['config']
+        elif 'card_data' in data:
+            card_data = data['card_data']
+            if 'authentication' in card_data:
+                auth = card_data['authentication']
+                data = {
+                    'IMSI': str(card_data.get('imsi', '')),
+                    'ICCID': str(card_data.get('iccid', '')),
+                    'MNC_LENGTH': str(card_data.get('mnc_length', '2')),
+                    'Ki': auth.get('ki', ''),
+                    'OPc': auth.get('opc', ''),
+                    'USE_OPC': '1' if auth.get('use_opc', True) else '0',
+                    'ALGO_2G': auth.get('algo_2g', 'MILENAGE'),
+                    'ALGO_3G': auth.get('algo_3g', 'MILENAGE'),
+                    'ALGO_4G5G': auth.get('algo_4g5g', 'MILENAGE'),
+                }
+
+        for field, value in data.items():
+            self._set_field_value(field, str(value))
+
     def _save_file(self):
-        """Save card configuration to file"""
+        """Save card configuration to CSV file (same format as input)"""
         filename = filedialog.asksaveasfilename(
             title="Save Card Configuration",
-            defaultextension=".json",
+            defaultextension=".csv",
             filetypes=[
-                ("JSON files", "*.json"),
+                ("CSV files", "*.csv"),
                 ("All files", "*.*")
             ]
         )
@@ -474,23 +493,21 @@ class CardEditorDialog(tk.Toplevel):
         if not filename:
             return
 
-        # Get all current values
-        config = {}
-        for field in list(self.basic_entries.keys()) + list(self.advanced_entries.keys()):
+        # Collect non-empty fields preserving column order
+        all_fields = list(self.basic_entries.keys()) + list(self.advanced_entries.keys())
+        headers = []
+        values = []
+        for field in all_fields:
             value = self.card_data.get(field, '')
-            if value:  # Only save non-empty fields
-                config[field] = value
-
-        # Add metadata
-        save_data = {
-            'version': '1.0',
-            'type': 'card_configuration',
-            'config': config
-        }
+            if value:
+                headers.append(field)
+                values.append(value)
 
         try:
-            with open(filename, 'w') as f:
-                json.dump(save_data, f, indent=2)
+            with open(filename, 'w', newline='') as f:
+                writer = csv.writer(f)
+                writer.writerow(headers)
+                writer.writerow(values)
 
             messagebox.showinfo("Success", f"Configuration saved to:\n{filename}")
 
