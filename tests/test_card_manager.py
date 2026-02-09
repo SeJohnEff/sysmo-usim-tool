@@ -394,7 +394,7 @@ class TestEncodeDecodeFunctions(unittest.TestCase):
     def test_encode_plmn_3digit_mnc(self):
         """Test PLMN encoding: "310410" (MCC=310, MNC=410)."""
         result = self.cm._encode_plmn("310410")
-        self.assertEqual(result, [0x13, 0x04, 0x01])
+        self.assertEqual(result, [0x13, 0x00, 0x14])
 
     def test_encode_plmn_invalid_length(self):
         with self.assertRaises(ValueError):
