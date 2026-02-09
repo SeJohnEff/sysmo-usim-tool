@@ -67,6 +67,11 @@ class TestModuleImports(unittest.TestCase):
         rc, err = self._run_import('theme')
         self.assertEqual(rc, 0, f"Failed to import theme: {err}")
 
+    def test_import_pytlv(self):
+        """pytlv is required at runtime for USIM TLV parsing in simcard.py."""
+        rc, err = self._run_import('pytlv.TLV')
+        self.assertEqual(rc, 0, f"Failed to import pytlv.TLV (install with: pip install pytlv): {err}")
+
 
 class TestCardManagerEndToEnd(unittest.TestCase):
     """Test CardManager construction and method availability via subprocess."""

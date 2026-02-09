@@ -1,0 +1,5 @@
+# Runtime dependencies for sysmo-usim-tool
+# Install with: pip install -r requirements.txt
+
+pytlv>=0.3
+pyscard>=2.0.0

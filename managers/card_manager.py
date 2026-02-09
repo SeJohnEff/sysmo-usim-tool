@@ -17,6 +17,27 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.card_detector import CardDetector, CardType
 from utils import asciihex_to_list, ascii_to_list, pad_asciihex
 
+# Required runtime dependencies for card operations
+REQUIRED_MODULES = {
+    'pytlv': 'pytlv',       # TLV parsing for USIM file operations
+    'smartcard': 'pyscard',  # Smart card reader access
+}
+
+
+def check_dependencies() -> List[str]:
+    """Check that all required runtime modules are installed.
+
+    Returns:
+        List of missing pip package names (empty if all OK).
+    """
+    missing = []
+    for module_name, pip_name in REQUIRED_MODULES.items():
+        try:
+            __import__(module_name)
+        except ImportError:
+            missing.append(pip_name)
+    return missing
+
 
 class CardError(Exception):
     """Base class for card-related errors"""
@@ -56,6 +77,12 @@ class CardManager:
         Returns:
             Tuple of (success, message)
         """
+        # Check dependencies before attempting any card operation
+        missing = check_dependencies()
+        if missing:
+            pkgs = ', '.join(missing)
+            return False, f"Missing required packages: {pkgs}. Install with: pip install {' '.join(missing)}"
+
         # Clear any previous card state first
         self.disconnect()
 

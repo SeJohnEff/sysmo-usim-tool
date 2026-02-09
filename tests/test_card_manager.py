@@ -14,6 +14,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from managers.card_manager import (
     CardManager, CardError, CardNotPresentError,
     CardAuthenticationError, CardLockError,
+    check_dependencies, REQUIRED_MODULES,
 )
 from utils.card_detector import CardType
 
@@ -548,6 +549,61 @@ class TestCardExceptions(unittest.TestCase):
     def test_card_lock_error(self):
         with self.assertRaises(CardLockError):
             raise CardLockError("locked")
+
+
+class TestDependencyCheck(unittest.TestCase):
+    """Test runtime dependency checking."""
+
+    def test_check_dependencies_all_present(self):
+        """When all modules are importable, returns empty list."""
+        with patch.dict('managers.card_manager.REQUIRED_MODULES', {'os': 'os', 'sys': 'sys'}):
+            missing = check_dependencies()
+            self.assertEqual(missing, [])
+
+    def test_check_dependencies_missing_module(self):
+        """When a module is missing, its pip name is returned."""
+        with patch.dict(
+            'managers.card_manager.REQUIRED_MODULES',
+            {'nonexistent_xyz_module': 'some-pip-package'},
+            clear=True,
+        ):
+            missing = check_dependencies()
+            self.assertEqual(missing, ['some-pip-package'])
+
+    def test_check_dependencies_pytlv_listed(self):
+        """pytlv must be in the required modules list."""
+        self.assertIn('pytlv', REQUIRED_MODULES)
+
+    def test_check_dependencies_pyscard_listed(self):
+        """pyscard must be in the required modules list."""
+        self.assertIn('smartcard', REQUIRED_MODULES)
+
+    @patch('managers.card_manager.check_dependencies')
+    def test_detect_card_fails_on_missing_deps(self, mock_check):
+        """detect_card() should fail early with a clear message when deps are missing."""
+        mock_check.return_value = ['pytlv']
+
+        cm = CardManager()
+        success, msg = cm.detect_card()
+
+        self.assertFalse(success)
+        self.assertIn('pytlv', msg)
+        self.assertIn('pip install', msg)
+
+    @patch('managers.card_manager.check_dependencies')
+    @patch('managers.card_manager.CardDetector')
+    def test_detect_card_proceeds_when_deps_ok(self, mock_detector_cls, mock_check):
+        """detect_card() proceeds normally when all deps are present."""
+        mock_check.return_value = []
+        mock_card = Mock()
+        mock_card.sim.card.get_ATR.return_value = [0x3B]
+        mock_detector_cls.create_card_object.return_value = (CardType.SJA5, mock_card)
+        mock_detector_cls.get_card_type_name.return_value = "SJA5"
+
+        cm = CardManager()
+        success, msg = cm.detect_card()
+
+        self.assertTrue(success)
 
 
 if __name__ == '__main__':
