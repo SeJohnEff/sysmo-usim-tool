@@ -1,6 +1,12 @@
 #!/bin/bash
 set -e
 
+# Start dbus (required by polkit, which pcscd uses for authorization)
+mkdir -p /run/dbus
+dbus-daemon --system --nofork &
+DBUS_PID=$!
+sleep 0.5
+
 # Start pcscd (smart card daemon) in background
 pcscd --foreground &
 PCSCD_PID=$!
@@ -10,7 +16,9 @@ sleep 1
 
 cleanup() {
     kill $PCSCD_PID 2>/dev/null || true
+    kill $DBUS_PID 2>/dev/null || true
     wait $PCSCD_PID 2>/dev/null || true
+    wait $DBUS_PID 2>/dev/null || true
 }
 trap cleanup EXIT
 
