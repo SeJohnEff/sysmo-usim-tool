@@ -353,7 +353,7 @@ class TestEncodeDecodeFunctions(unittest.TestCase):
         result = self.cm._encode_imsi("240010000167270")
         self.assertEqual(result[0], 15)  # length
         self.assertIsInstance(result, list)
-        self.assertEqual(len(result), 8)  # 1 length + 7.5 digits -> 8 bytes
+        self.assertEqual(len(result), 9)  # 1 length byte + ceil(15/2) = 8 BCD bytes
 
     def test_encode_imsi_roundtrip(self):
         original = "240010000167270"
