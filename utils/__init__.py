@@ -25,6 +25,7 @@ swap_nibbles = _root_utils.swap_nibbles
 list_to_int = _root_utils.list_to_int
 int_to_list = _root_utils.int_to_list
 id_to_str = _root_utils.id_to_str
+str_to_id = _root_utils.str_to_id
 
 __all__ = [
     'hexdump',
@@ -35,4 +36,5 @@ __all__ = [
     'list_to_int',
     'int_to_list',
     'id_to_str',
+    'str_to_id',
 ]
