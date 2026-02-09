@@ -169,6 +169,60 @@ class SysmoUSIMToolGUI:
         self.root.bind('<Control-d>', lambda e: self._detect_card())
         self.root.bind('<F5>', lambda e: self._detect_card())
 
+        # Enable standard copy/paste/cut in all Entry and Text widgets
+        self.root.bind_class('Entry', '<Control-v>', self._paste_clipboard)
+        self.root.bind_class('Entry', '<Control-c>', self._copy_clipboard)
+        self.root.bind_class('Entry', '<Control-x>', self._cut_clipboard)
+        self.root.bind_class('Entry', '<Control-a>', self._select_all)
+        self.root.bind_class('Text', '<Control-v>', self._paste_clipboard)
+        self.root.bind_class('Text', '<Control-c>', self._copy_clipboard)
+
+    @staticmethod
+    def _paste_clipboard(event):
+        """Paste from clipboard into focused widget"""
+        try:
+            widget = event.widget
+            text = widget.clipboard_get()
+            if widget.select_present() if hasattr(widget, 'select_present') else False:
+                widget.delete(tk.SEL_FIRST, tk.SEL_LAST)
+            widget.insert(tk.INSERT, text)
+            return 'break'
+        except tk.TclError:
+            pass
+
+    @staticmethod
+    def _copy_clipboard(event):
+        """Copy selection to clipboard"""
+        try:
+            widget = event.widget
+            if hasattr(widget, 'selection_get'):
+                text = widget.selection_get()
+                widget.clipboard_clear()
+                widget.clipboard_append(text)
+            return 'break'
+        except tk.TclError:
+            pass
+
+    @staticmethod
+    def _cut_clipboard(event):
+        """Cut selection to clipboard"""
+        try:
+            widget = event.widget
+            if hasattr(widget, 'selection_get'):
+                text = widget.selection_get()
+                widget.clipboard_clear()
+                widget.clipboard_append(text)
+                widget.delete(tk.SEL_FIRST, tk.SEL_LAST)
+            return 'break'
+        except tk.TclError:
+            pass
+
+    @staticmethod
+    def _select_all(event):
+        """Select all text in entry"""
+        event.widget.select_range(0, tk.END)
+        return 'break'
+
     def log(self, message: str, level: str = "INFO"):
         """Add message to log"""
         timestamp = datetime.now().strftime("%H:%M:%S")

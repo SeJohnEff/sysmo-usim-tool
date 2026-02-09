@@ -350,10 +350,12 @@ class TestEncodeDecodeFunctions(unittest.TestCase):
         self.cm = CardManager()
 
     def test_encode_imsi_15_digits(self):
+        """_encode_imsi uses asciihex_to_list(pad_asciihex(imsi, True, '9'))"""
         result = self.cm._encode_imsi("240010000167270")
-        self.assertEqual(result[0], 15)  # length
         self.assertIsInstance(result, list)
-        self.assertEqual(len(result), 9)  # 1 length byte + ceil(15/2) = 8 BCD bytes
+        # 15 digits, front-padded with '9' -> "9240010000167270" -> 8 bytes
+        self.assertEqual(len(result), 8)
+        self.assertEqual(result[0], 0x92)  # '9' pad + first digit '2'
 
     def test_encode_imsi_roundtrip(self):
         original = "240010000167270"
@@ -369,16 +371,16 @@ class TestEncodeDecodeFunctions(unittest.TestCase):
 
     def test_decode_imsi_invalid(self):
         self.assertIsNone(self.cm._decode_imsi([]))
-        self.assertIsNone(self.cm._decode_imsi([0]))
 
     def test_encode_iccid(self):
         result = self.cm._encode_iccid("8949440000001672706")
         self.assertIsInstance(result, list)
-        # 19 digits -> 10 bytes (last nibble padded with F)
+        # 19 digits, end-padded with 'f' -> "8949440000001672706f" -> 10 bytes
         self.assertEqual(len(result), 10)
+        self.assertEqual(result[0], 0x89)
 
     def test_encode_iccid_roundtrip(self):
-        original = "89494400000016727060"  # 20-digit ICCID
+        original = "89494400000016727060"  # 20-digit ICCID (even, no padding)
         encoded = self.cm._encode_iccid(original)
         decoded = self.cm._decode_iccid(encoded)
         self.assertEqual(decoded, original)

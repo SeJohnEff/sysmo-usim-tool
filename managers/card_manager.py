@@ -15,7 +15,7 @@ from typing import Optional, Dict, List, Tuple
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from utils.card_detector import CardDetector, CardType
-from utils import asciihex_to_list, ascii_to_list
+from utils import asciihex_to_list, ascii_to_list, pad_asciihex
 
 
 class CardError(Exception):
@@ -297,60 +297,42 @@ class CardManager:
             return False, [f"Verification error: {str(e)}"]
 
     def _encode_imsi(self, imsi: str) -> List[int]:
-        """Encode IMSI string to BCD format"""
-        # IMSI encoding: length byte + BCD encoded digits
-        encoded = [len(imsi)]
-        for i in range(0, len(imsi), 2):
-            if i + 1 < len(imsi):
-                byte = int(imsi[i + 1]) << 4 | int(imsi[i])
-            else:
-                byte = 0xF0 | int(imsi[i])
-            encoded.append(byte)
-        return encoded
+        """Encode IMSI string to byte list for write_imsi().
+
+        write_imsi() in sysmo_usim.py prepends the length and calls
+        swap_nibbles(), so we must NOT do BCD encoding here.
+        Match the CLI: asciihex_to_list(pad_asciihex(imsi, front=True, padding='9'))
+        """
+        return asciihex_to_list(pad_asciihex(imsi, True, '9'))
 
     def _decode_imsi(self, imsi_raw: List[int]) -> str:
-        """Decode IMSI from BCD format"""
-        if not imsi_raw or len(imsi_raw) < 2:
+        """Decode IMSI from the byte-list format returned by _encode_imsi."""
+        if not imsi_raw or len(imsi_raw) < 1:
             return None
-
-        imsi = ""
-        length = imsi_raw[0]
-        for byte in imsi_raw[1:]:
-            digit1 = byte & 0x0F
-            digit2 = (byte >> 4) & 0x0F
-            if digit1 != 0xF:
-                imsi += str(digit1)
-            if digit2 != 0xF:
-                imsi += str(digit2)
-            if len(imsi) >= length:
-                break
-        return imsi
+        # Each byte is two hex digits representing IMSI digits
+        # First nibble of first byte is the padding '9', skip it
+        hex_str = ''.join('{:02x}'.format(b) for b in imsi_raw)
+        # Strip leading '9' padding (added by pad_asciihex)
+        if len(hex_str) % 2 == 0 and hex_str.startswith('9'):
+            hex_str = hex_str[1:]
+        return hex_str
 
     def _encode_iccid(self, iccid: str) -> List[int]:
-        """Encode ICCID string to nibble-swapped format"""
-        encoded = []
-        for i in range(0, len(iccid), 2):
-            if i + 1 < len(iccid):
-                byte = int(iccid[i + 1]) << 4 | int(iccid[i])
-            else:
-                byte = 0xF0 | int(iccid[i])
-            encoded.append(byte)
-        return encoded
+        """Encode ICCID string to byte list for write_iccid().
+
+        write_iccid() in sysmo_usim.py calls swap_nibbles(), so we
+        must NOT do nibble swapping here.
+        Match the CLI: asciihex_to_list(pad_asciihex(iccid))
+        """
+        return asciihex_to_list(pad_asciihex(iccid))
 
     def _decode_iccid(self, iccid_raw: List[int]) -> str:
-        """Decode ICCID from nibble-swapped format"""
+        """Decode ICCID from the byte-list format returned by _encode_iccid."""
         if not iccid_raw:
             return None
-
-        iccid = ""
-        for byte in iccid_raw:
-            digit1 = byte & 0x0F
-            digit2 = (byte >> 4) & 0x0F
-            if digit1 != 0xF:
-                iccid += str(digit1)
-            if digit2 != 0xF:
-                iccid += str(digit2)
-        return iccid
+        hex_str = ''.join('{:02x}'.format(b) for b in iccid_raw)
+        # Strip trailing 'f' padding
+        return hex_str.rstrip('f')
 
     def _program_milenage_params(self, card_data: Dict[str, str]):
         """Program Milenage R and C parameters"""
