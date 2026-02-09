@@ -1,0 +1,12 @@
+.git
+__pycache__
+*.pyc
+.DS_Store
+tests/
+test_requirements.txt
+.flake8
+.github/
+pytest.ini
+*.egg-info
+*.egg
+my_claude_chat.md
