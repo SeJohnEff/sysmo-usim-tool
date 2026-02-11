@@ -63,8 +63,8 @@ class BackupManager:
                         "algo_2g": card_data.get('ALGO_2G'),
                         "algo_3g": card_data.get('ALGO_3G'),
                         "algo_4g5g": card_data.get('ALGO_4G5G'),
-                        "ki": card_data.get('Ki'),
-                        "opc": card_data.get('OPc'),
+                        "ki": current_state.get('ki') if current_state and current_state.get('ki') else card_data.get('Ki'),
+                        "opc": current_state.get('opc') if current_state and current_state.get('opc') else card_data.get('OPc'),
                         "use_opc": card_data.get('USE_OPC', '1') == '1',
                     },
                     "milenage_params": {

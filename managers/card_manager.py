@@ -192,13 +192,8 @@ class CardManager:
                 print(f"ERROR: Failed to read MNC length: {e}")
                 data['mnc_length'] = None
 
-            # Read authentication key (Ki)
-            # Note: This requires card-specific methods
-            # For now, we'll mark it as not readable (security)
-            data['ki_readable'] = False
-
-            # Read algorithm settings (if available)
-            # This is card-specific and may not be directly readable
+            # Read Ki and OPc from card
+            self._read_ki_opc(data)
 
             return data
 
@@ -318,6 +313,16 @@ class CardManager:
                 if current_data['iccid'] != expected_data['ICCID']:
                     mismatches.append(f"ICCID: expected {expected_data['ICCID']}, got {current_data['iccid']}")
 
+            # Compare Ki
+            if 'Ki' in expected_data and expected_data['Ki'] and current_data.get('ki'):
+                if current_data['ki'].lower() != expected_data['Ki'].lower():
+                    mismatches.append(f"Ki: expected {expected_data['Ki']}, got {current_data['ki']}")
+
+            # Compare OPc
+            if 'OPc' in expected_data and expected_data['OPc'] and current_data.get('opc'):
+                if current_data['opc'].lower() != expected_data['OPc'].lower():
+                    mismatches.append(f"OPc: expected {expected_data['OPc']}, got {current_data['opc']}")
+
             return len(mismatches) == 0, mismatches
 
         except Exception as e:
@@ -360,6 +365,80 @@ class CardManager:
         hex_str = ''.join('{:02x}'.format(b) for b in iccid_raw)
         # Strip trailing 'f' padding
         return hex_str.rstrip('f')
+
+    def _read_ki_opc(self, data: Dict):
+        """Read Ki and OPc values from the card"""
+        try:
+            if self.card_type == CardType.SJS1:
+                self._read_ki_opc_sjs1(data)
+            elif self.card_type in (CardType.SJA2, CardType.SJA5):
+                self._read_ki_opc_sja(data)
+        except Exception as e:
+            print(f"ERROR: Failed to read Ki/OPc: {e}")
+
+    def _read_ki_opc_sjs1(self, data: Dict):
+        """Read Ki and OPc from SJS1 card"""
+        from sysmo_usim_sjs1 import SYSMO_USIMSJS1_EF_KI, SYSMO_USIMSJS1_EF_OPC
+        from simcard import GSM_SIM_DF_GSM
+
+        # Read Ki
+        try:
+            self.card.sim.select(GSM_SIM_DF_GSM)
+            self.card.sim.select(SYSMO_USIMSJS1_EF_KI)
+            res = self.card.sim.read_binary(16)
+            apdu = res.apdu if hasattr(res, 'apdu') else res
+            data['ki'] = ''.join('{:02x}'.format(x) for x in apdu)
+        except Exception as e:
+            print(f"ERROR: Failed to read Ki: {e}")
+
+        # Read OPc
+        try:
+            self.card.sim.select(GSM_SIM_DF_GSM)
+            self.card.sim.select(SYSMO_USIMSJS1_EF_OPC)
+            res = self.card.sim.read_binary(17)
+            apdu = res.apdu if hasattr(res, 'apdu') else res
+            # First byte is mode (0=OP, 1=OPc), bytes 1-16 are the value
+            data['opc'] = ''.join('{:02x}'.format(x) for x in apdu[1:])
+            data['use_opc'] = apdu[0]  # 0=OP, 1=OPc
+        except Exception as e:
+            print(f"ERROR: Failed to read OPc: {e}")
+
+    def _read_ki_opc_sja(self, data: Dict):
+        """Read Ki and OPc from SJA2/SJA5 card"""
+        from sysmo_isim_sja2 import (
+            SYSMO_ISIMSJA2_EF_USIM_AUTH_KEY,
+            SYSMO_ISIMSJAX_FILE_EF_USIM_AUTH_KEY,
+            SYSMO_ISIMSJA2_ALGO_MILENAGE,
+            sysmo_isimsjax_16_byte_key_algorithms,
+        )
+        from simcard import GSM_SIM_MF
+
+        try:
+            # Select ADF.USIM / EF_USIM_AUTH_KEY (3G key)
+            self.card.sim.select(GSM_SIM_MF)
+            self.card.sim.card.SELECT_ADF_USIM()
+            self.card.sim.select(SYSMO_ISIMSJA2_EF_USIM_AUTH_KEY)
+            res = self.card.sim.read_binary(self.card.sim.filelen)
+            apdu = res.apdu if hasattr(res, 'apdu') else res
+            ef = SYSMO_ISIMSJAX_FILE_EF_USIM_AUTH_KEY(apdu)
+
+            # Extract Ki
+            if ef.algo in sysmo_isimsjax_16_byte_key_algorithms:
+                data['ki'] = ''.join('{:02x}'.format(x) for x in ef.algo_key.ki)
+            elif hasattr(ef.algo_key, 'key'):
+                # TUAK key
+                data['ki'] = ''.join('{:02x}'.format(x) for x in ef.algo_key.key[:16])
+
+            # Extract OPc
+            if ef.algo == SYSMO_ISIMSJA2_ALGO_MILENAGE:
+                data['opc'] = ''.join('{:02x}'.format(x) for x in ef.algo_key.opc)
+                data['use_opc'] = 1 if ef.algo_pars.use_opc else 0
+            elif hasattr(ef.algo_key, 'topc'):
+                data['opc'] = ''.join('{:02x}'.format(x) for x in ef.algo_key.topc)
+                data['use_opc'] = 1 if ef.algo_pars.use_topc else 0
+
+        except Exception as e:
+            print(f"ERROR: Failed to read Ki/OPc from SJA: {e}")
 
     def _program_milenage_params(self, card_data: Dict[str, str]):
         """Program Milenage R and C parameters"""
