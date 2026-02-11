@@ -349,10 +349,14 @@ class CardEditorDialog(tk.Toplevel):
                 self._set_field_value('IMSI', data['imsi'])
             if data.get('iccid'):
                 self._set_field_value('ICCID', data['iccid'])
+            if data.get('ki'):
+                self._set_field_value('Ki', data['ki'])
+            if data.get('opc'):
+                self._set_field_value('OPc', data['opc'])
             if data.get('mnc_length'):
                 self._set_field_value('MNC_LENGTH', str(data['mnc_length']))
 
-            messagebox.showinfo("Success", "Card data read successfully!\n\nNote: Ki and OPc cannot be read from card for security reasons.")
+            messagebox.showinfo("Success", "Card data read successfully!")
 
         except Exception as e:
             messagebox.showerror("Error", f"Failed to read card: {e}")
