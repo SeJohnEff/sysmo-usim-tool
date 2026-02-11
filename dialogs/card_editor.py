@@ -42,6 +42,7 @@ class CardEditorDialog(tk.Toplevel):
 
         self.show_advanced = tk.BooleanVar(value=False)
         self.validation_errors = {}
+        self.extra_columns = {}  # Columns from input CSV not in form fields
 
         self._create_widgets()
         self._setup_clipboard()
@@ -453,9 +454,14 @@ class CardEditorDialog(tk.Toplevel):
             row = next(reader, None)
             if not row:
                 raise ValueError("CSV file has no data rows")
+            known_fields = set(self.basic_entries.keys()) | set(self.advanced_entries.keys())
+            self.extra_columns = {}
             for field, value in row.items():
                 if value:
-                    self._set_field_value(field, value)
+                    if field in known_fields:
+                        self._set_field_value(field, value)
+                    else:
+                        self.extra_columns[field] = value
 
     def _load_json_file(self, filename):
         """Load card configuration from JSON file"""
@@ -504,6 +510,11 @@ class CardEditorDialog(tk.Toplevel):
         values = []
         for field in all_fields:
             value = self.card_data.get(field, '')
+            if value:
+                headers.append(field)
+                values.append(value)
+        # Append extra columns from input CSV (HPLMN, ROUTING_INDICATOR, etc.)
+        for field, value in self.extra_columns.items():
             if value:
                 headers.append(field)
                 values.append(value)

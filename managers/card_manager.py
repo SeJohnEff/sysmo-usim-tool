@@ -387,7 +387,7 @@ class CardManager:
             self.card.sim.select(SYSMO_USIMSJS1_EF_KI)
             res = self.card.sim.read_binary(16)
             apdu = res.apdu if hasattr(res, 'apdu') else res
-            data['ki'] = ''.join('{:02x}'.format(x) for x in apdu)
+            data['ki'] = ''.join('{:02X}'.format(x) for x in apdu)
         except Exception as e:
             print(f"ERROR: Failed to read Ki: {e}")
 
@@ -398,7 +398,7 @@ class CardManager:
             res = self.card.sim.read_binary(17)
             apdu = res.apdu if hasattr(res, 'apdu') else res
             # First byte is mode (0=OP, 1=OPc), bytes 1-16 are the value
-            data['opc'] = ''.join('{:02x}'.format(x) for x in apdu[1:])
+            data['opc'] = ''.join('{:02X}'.format(x) for x in apdu[1:])
             data['use_opc'] = apdu[0]  # 0=OP, 1=OPc
         except Exception as e:
             print(f"ERROR: Failed to read OPc: {e}")
@@ -424,17 +424,17 @@ class CardManager:
 
             # Extract Ki
             if ef.algo in sysmo_isimsjax_16_byte_key_algorithms:
-                data['ki'] = ''.join('{:02x}'.format(x) for x in ef.algo_key.ki)
+                data['ki'] = ''.join('{:02X}'.format(x) for x in ef.algo_key.ki)
             elif hasattr(ef.algo_key, 'key'):
                 # TUAK key
-                data['ki'] = ''.join('{:02x}'.format(x) for x in ef.algo_key.key[:16])
+                data['ki'] = ''.join('{:02X}'.format(x) for x in ef.algo_key.key[:16])
 
             # Extract OPc
             if ef.algo == SYSMO_ISIMSJA2_ALGO_MILENAGE:
-                data['opc'] = ''.join('{:02x}'.format(x) for x in ef.algo_key.opc)
+                data['opc'] = ''.join('{:02X}'.format(x) for x in ef.algo_key.opc)
                 data['use_opc'] = 1 if ef.algo_pars.use_opc else 0
             elif hasattr(ef.algo_key, 'topc'):
-                data['opc'] = ''.join('{:02x}'.format(x) for x in ef.algo_key.topc)
+                data['opc'] = ''.join('{:02X}'.format(x) for x in ef.algo_key.topc)
                 data['use_opc'] = 1 if ef.algo_pars.use_topc else 0
 
         except Exception as e:
